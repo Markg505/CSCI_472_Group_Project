@@ -9,27 +9,43 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const onSubmit = async (values: FormData) => {
+  const onSubmit = async (v: FormData) => {
     try {
-      await login(values.email, values.password);
-      navigate("/"); // or send to role-specific pages later
+      await login(v.email, v.password);
+      navigate("/");
     } catch (e: any) {
       alert(e?.response?.data?.message ?? "Login failed");
     }
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: "40px auto" }}>
-      <h1>Sign in</h1>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <label>Email</label>
-        <input {...register("email")} type="email" />
-        <label>Password</label>
-        <input {...register("password")} type="password" />
-        <button disabled={isSubmitting} style={{ marginTop: 12 }}>
-          {isSubmitting ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-    </div>
+    <section className="container-xl py-16">
+      <div className="max-w-md mx-auto p-8 rounded-3xl bg-card border border-white/10 shadow-2xl">
+        <h1 className="h2">Sign in</h1>
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
+          <div>
+            <label className="block text-sm text-mute mb-1">Email</label>
+            <input
+              type="email"
+              {...register("email")}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-mute mb-1">Password</label>
+            <input
+              type="password"
+              {...register("password")}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+              placeholder="••••••••"
+            />
+          </div>
+          <button className="btn-primary w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </div>
+    </section>
   );
 }
