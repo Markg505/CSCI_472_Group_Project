@@ -1,0 +1,28 @@
+/* Load Tailwind */
+@import "tailwindcss";
+
+/* === Design tokens (v4) === */
+@theme {
+  --color-bg:   #0f0f10;
+  --color-card: #161617;
+  --color-gold: #bfa26a;
+  --color-text: #e7e7e7;
+  --color-mute: #b3b3b3;
+
+  /* Optional fonts if you’re bringing in Google Fonts in index.html */
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: "Playfair Display", serif;
+}
+
+/* Global defaults */
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+body { @apply bg-bg text-text font-sans antialiased; }
+
+/* Helpers */
+.h1 { @apply font-display text-5xl md:text-7xl leading-tight tracking-tight; }
+.h2 { @apply font-display text-3xl md:text-5xl leading-snug; }
+.container-xl { @apply max-w-6xl mx-auto px-4 md:px-6; }
+
+.btn-primary { @apply inline-flex items-center gap-2 rounded-2xl px-5 py-3 bg-gold text-black font-medium hover:opacity-90 transition; }
+.btn-ghost   { @apply inline-flex items-center gap-2 rounded-2xl px-5 py-3 border border-white/15 hover:bg-white/5 transition; }
