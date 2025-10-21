@@ -1,4 +1,4 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../features/auth/useAuth";
 import { useState } from "react";
 
@@ -16,6 +16,9 @@ const LinkStyle = ({ to, label }: { to: string; label: string }) => (
 export default function NavBar() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+
+    if (pathname.startsWith("/admin")) return null;
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-bg/70 border-b border-white/10">

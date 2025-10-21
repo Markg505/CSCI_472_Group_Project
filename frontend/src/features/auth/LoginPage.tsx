@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { useAuth } from "./useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 type FormData = { email: string; password: string };
 
@@ -45,6 +45,21 @@ export default function LoginPage() {
             {isSubmitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        {/* reg links */}
+        <div className="mt-6 space-y-2 text-center text-sm text-mute">
+          <div>
+            Don’t have an account?{" "}
+            <Link to="/register" className="text-gold hover:underline">
+              Register
+            </Link>
+          </div>
+          <div>
+            <Link to="/reset-password" className="text-gold hover:underline">
+              Reset password
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );
