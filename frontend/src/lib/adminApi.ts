@@ -1,8 +1,38 @@
 export type Role = "admin" | "user";
+export type CountFreq = "daily" | "weekly" | "monthly";
+export type Unit = "each" | "lb" | "oz" | "case" | "bag";
+export type Allergen =
+  | "none" | "gluten" | "dairy" | "eggs" | "soy"
+  | "peanuts" | "tree-nuts" | "shellfish" | "fish" | "sesame";
 
 export type UserRow = { id: string; name: string; email: string; role: Role };
 export type MenuItem = { id: string; name: string; price: number; category: string; available: boolean };
 export type TableRow = { id: string; number: number; capacity: number; notes?: string };
+export type InventoryItem = {
+  id: string;
+  name: string;
+  sku: string;                 
+  category: string;
+  unit: Unit;                  
+  packSize: number;            
+  qtyOnHand: number;
+  parLevel: number;            
+  reorderPoint: number;        
+  cost: number;               
+  location: string;           
+  active: boolean;
+  vendor: string;              
+  leadTimeDays: number;
+  preferredOrderQty: number;
+  wasteQty: number;            
+  lastCountedAt: string;      
+  countFreq: CountFreq;        
+  lot: string;                 
+  expiryDate: string;          
+  allergen: Allergen;          
+  conversion: string;          
+};
+export type NewInventoryItem = Omit<InventoryItem, "id">;
 
 let USERS: UserRow[] = [
   { id: "1", name: "Alice Admin", email: "alice@example.com", role: "admin" },
@@ -73,3 +103,105 @@ export async function removeBooking(id: string) {
   await wait(120);
   BOOKINGS = BOOKINGS.filter(b => b.id !== id);
 }
+const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
+let INVENTORY: InventoryItem[] = load();
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0,10);
+}
+
+function seed(): InventoryItem[] {
+  const rows: InventoryItem[] = [
+    {
+      id: crypto.randomUUID(),
+      name: "Brioche Buns",
+      sku: "BN-BRIOCHE-12",
+      category: "Bakery",
+      unit: "case",
+      packSize: 12,
+      qtyOnHand: 3,
+      parLevel: 4,
+      reorderPoint: 2,
+      cost: 16.5,
+      location: "Dry A3",
+      active: true,
+
+      vendor: "Sunrise Bakery",
+      leadTimeDays: 2,
+      preferredOrderQty: 4,
+      wasteQty: 6,
+      lastCountedAt: todayISO(),
+      countFreq: "weekly",
+      lot: "BB-2409A",
+      expiryDate: "",
+      allergen: "gluten",
+      conversion: "1 case = 12 each",
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Ground Beef 80/20",
+      sku: "MEAT-GB80-5LB",
+      category: "Meat",
+      unit: "lb",
+      packSize: 5,
+      qtyOnHand: 18,
+      parLevel: 20,
+      reorderPoint: 12,
+      cost: 3.2,
+      location: "Walk-in",
+      active: true,
+      vendor: "Acme Meats",
+      leadTimeDays: 1,
+      preferredOrderQty: 50,
+      wasteQty: 0,
+      lastCountedAt: todayISO(),
+      countFreq: "weekly",
+      lot: "GB-2410",
+      expiryDate: "",
+      allergen: "none",
+      conversion: "1 bag = 5 lb",
+    },
+  ];
+  localStorage.setItem(KEY, JSON.stringify(rows));
+  return rows;
+}
+
+function load(): InventoryItem[] {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return seed();
+    return JSON.parse(raw) as InventoryItem[];
+  } catch {
+    return seed();
+  }
+}
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(INVENTORY));
+}
+
+// --- CRUD API (fake) ---
+export async function listInventory(): Promise<InventoryItem[]> {
+  return structuredClone(INVENTORY);
+}
+
+export async function addInventoryItem(item: NewInventoryItem): Promise<InventoryItem> {
+  const row: InventoryItem = { ...item, id: crypto.randomUUID() };
+  INVENTORY.unshift(row);
+  save();
+  return structuredClone(row);
+}
+
+export async function updateInventoryItem(
+  id: string,
+  patch: Partial<NewInventoryItem>
+): Promise<InventoryItem> {
+  const idx = INVENTORY.findIndex(r => r.id === id);
+  if (idx === -1) throw new Error("not found");
+  INVENTORY[idx] = { ...INVENTORY[idx], ...patch };
+  save();
+  return structuredClone(INVENTORY[idx]);
+}
+
+export async function removeInventoryItem(id: string): Promise<void> {
+  INVENTORY = INVENTORY.filter(r => r.id !== id);
+  save();}
