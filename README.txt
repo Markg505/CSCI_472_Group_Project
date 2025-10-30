@@ -1,6 +1,4 @@
-RBOS Web Deployment Package Preliminary Structure for Team Review.
-
-Includes frontend and backend folders as of 10/25/2025, with some modifications for compatibility made 10/25/2025
+RBOS Web Deployment Package.
 
 Package Structure:
 
