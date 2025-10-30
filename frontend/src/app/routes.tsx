@@ -4,6 +4,9 @@ import HomePage from "../pages/HomePage";
 import ReservationsPage from "../pages/ReservationsPage";
 import RegisterPage from "../pages/Register";
 import LoginPage from "../features/auth/LoginPage";
+import CustomerMenu from "../pages/CustomerMenu";
+
+
 
 // Admin
 import AdminShell from "../pages/Admin/AdminLayout";
@@ -21,23 +24,24 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: "reservations", element: <ReservationsPage /> },
+      { path: "reservations", element: <ReservationsPage /> }, // public page
       { path: "login", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
+      { path: "menu", element: <CustomerMenu /> },
 
-      // Admin (Headless UI navbar template)
+      // Admin
       {
         path: "admin",
         element: <AdminShell />,
         children: [
-          { index: true, element: <Dashboard /> }, // /admin
-          { path: "users", element: <Users /> },
-          { path: "bookings", element: <Bookings /> },
-          { path: "menu", element: <Menu /> },
+          { index: true, element: <Dashboard /> },   // /admin
+          { path: "users", element: <Users /> },     // /admin/users
+          { path: "reservations", element: <Bookings /> }, // /admin/reservations -> Bookings.ts
+          { path: "menu", element: <Menu /> },       // /admin/menu -> Menu.ts
           { path: "tables", element: <Tables /> },
           { path: "inventory", element: <Inventory /> },
           { path: "settings", element: <Settings /> },
-          ],
+        ],
         },
       ],
     },
