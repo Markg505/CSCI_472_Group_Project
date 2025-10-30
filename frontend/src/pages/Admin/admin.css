@@ -1,0 +1,12 @@
+.admin-panel {
+  background: repeating-linear-gradient(
+    -45deg,
+    #f7f9fc,
+    #f7f9fc 6px,
+    #f1f4f8 6px,
+    #f1f4f8 12px
+  );
+  border: 1px dashed #cbd5e1; /* slate-300 */
+}
+.admin-panel { color: #0f172a; }
+.admin-panel p { color: #334155; }
