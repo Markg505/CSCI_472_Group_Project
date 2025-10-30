@@ -1,90 +1,94 @@
 <project name="RBOS_Web_Deployment" default="package-war" basedir=".">
 
-    <property name="src.dir" value="src"/>
-    <property name="frontend.dir" value="${basedir}/frontend"/>
-    <property name="build.dir" value="${basedir}/build"/>
-    <property name="dist.dir" value="${basedir}/dist"/>
-    <property name="webcontent.dir" value="${src.dir}/main/webapp"/>
-    <property name="webinf.dir" value="${webcontent.dir}/WEB-INF"/>
-    <property name="classes.dir" value="${build.dir}/classes"/>
-    <property name="lib.dir" value="${webinf.dir}/lib"/>
-    <property name="war.file" value="${dist.dir}/${ant.project.name}.war"/>
+  <!-- === paths (backend lives under backend/src) === -->
+  <property name="src.dir"        value="backend/src"/>
+  <property name="frontend.dir"   value="${basedir}/frontend"/>
+  <property name="build.dir"      value="${basedir}/build"/>
+  <property name="dist.dir"       value="${basedir}/dist"/>
+  <property name="webcontent.dir" value="${src.dir}/main/webapp"/>
+  <property name="webinf.dir"     value="${webcontent.dir}/WEB-INF"/>
+  <property name="classes.dir"    value="${build.dir}/classes"/>
+  <property name="lib.dir"        value="${webinf.dir}/lib"/>
+  <property name="war.file"       value="${dist.dir}/${ant.project.name}.war"/>
 
-    <path id="compile.classpath">
-        <fileset dir="${lib.dir}">
-            <include name="*.jar"/>
-        </fileset>
-    </path>
+  <!-- compile-only API jars (e.g., compile-lib/jakarta.ws.rs-api-3.1.0.jar) -->
+  <property name="compile.lib.dir" value="${basedir}/compile-lib"/>
 
-    <target name="clean">
-        <delete dir="${build.dir}"/>
-        <delete dir="${dist.dir}"/>
-        <!-- Clean webapp content except WEB-INF -->
-        <delete includeEmptyDirs="true">
-            <fileset dir="${webcontent.dir}">
-                <include name="**/*"/>
-                <exclude name="WEB-INF/**"/>
-            </fileset>
-        </delete>
-    </target>
+  <path id="compile.classpath">
+    <!-- runtime libs that WILL be packaged (sqlite-jdbc, slf4j…) -->
+    <fileset dir="${lib.dir}">
+      <include name="*.jar"/>
+    </fileset>
+    <!-- compile-only APIs that will NOT be packaged -->
+    <fileset dir="${compile.lib.dir}">
+      <include name="*.jar"/>
+    </fileset>
+  </path>
 
-    <target name="build-frontend">
-        <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
-            <arg value="/c"/>
-            <arg value="npm"/>
-            <arg value="install"/>
-        </exec>
-        <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
-            <arg value="/c"/>
-            <arg value="npm"/>
-            <arg value="run"/>
-            <arg value="build"/>
-        </exec>
-        <copy todir="${webcontent.dir}">
-            <fileset dir="${frontend.dir}/dist">
-                <include name="**/*"/>
-            </fileset>
-        </copy>
-    </target>
+  <!-- === tasks === -->
 
-    <target name="init" depends="clean,build-frontend">
-        <mkdir dir="${build.dir}"/>
-        <mkdir dir="${dist.dir}"/>
-        <mkdir dir="${classes.dir}"/>
-    </target>
+  <target name="clean">
+    <delete dir="${build.dir}"/>
+    <delete dir="${dist.dir}"/>
+    <!-- don't touch webcontent here; it might not exist yet -->
+  </target>
 
-    <target name="compile" depends="init">
-        <javac srcdir="${src.dir}/main/java"
-               destdir="${classes.dir}"
-               classpathref="compile.classpath"
-               debug="true"
-               includeantruntime="false"/>
-    </target>
+  <target name="build-frontend">
+    <!-- make sure webapp exists before copying the built template -->
+    <mkdir dir="${webcontent.dir}"/>
+    <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
+      <arg value="/c"/><arg value="npm"/><arg value="install"/>
+    </exec>
+    <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
+      <arg value="/c"/><arg value="npm"/><arg value="run"/><arg value="build"/>
+    </exec>
+    <copy todir="${webcontent.dir}">
+      <fileset dir="${frontend.dir}/dist">
+        <include name="**/*"/>
+      </fileset>
+    </copy>
+  </target>
 
-    <target name="package-war" depends="compile">
-        <war destfile="${war.file}" webxml="${webinf.dir}/web.xml">
-            <fileset dir="${webcontent.dir}"/>
-            <lib dir="${lib.dir}"/>
-            <classes dir="${classes.dir}"/>
-        </war>
-        <echo message="WAR file created at: ${war.file}"/>
-    </target>
+  <target name="init" depends="clean,build-frontend">
+    <mkdir dir="${build.dir}"/>
+    <mkdir dir="${dist.dir}"/>
+    <mkdir dir="${classes.dir}"/>
+    <mkdir dir="${lib.dir}"/>
+  </target>
 
-    <target name="package-war-no-xml" depends="compile">
-        <war destfile="${war.file}"  needxmlfile="false">
-            <fileset dir="${webcontent.dir}"/>
-            <lib dir="${lib.dir}"/>
-            <classes dir="${classes.dir}"/>
-        </war>
-        <echo message="WAR file created at: ${war.file}"/>
-    </target>
+  <target name="compile" depends="init">
+    <javac srcdir="${src.dir}/main/java"
+           destdir="${classes.dir}"
+           classpathref="compile.classpath"
+           debug="true"
+           includeantruntime="false"/>
+  </target>
 
-    <target name="test-minimal">
-        <war destfile="${dist.dir}/simple-test.war" needxmlfile="false">
-            <fileset dir="${webcontent.dir}">
-                <include name="index.html"/>
-            </fileset>
-        </war>
-    </target>
+  <target name="package-war" depends="compile">
+    <war destfile="${war.file}" webxml="${webinf.dir}/web.xml">
+      <fileset dir="${webcontent.dir}"/>
+      <lib dir="${lib.dir}"/>
+      <classes dir="${classes.dir}"/>
+    </war>
+    <echo message="WAR file created at: ${war.file}"/>
+  </target>
+
+  <target name="package-war-no-xml" depends="compile">
+    <war destfile="${war.file}" needxmlfile="false">
+      <fileset dir="${webcontent.dir}"/>
+      <lib dir="${lib.dir}"/>
+      <classes dir="${classes.dir}"/>
+    </war>
+    <echo message="WAR file created at: ${war.file}"/>
+  </target>
+
+  <target name="test-minimal">
+    <mkdir dir="${dist.dir}"/>
+    <war destfile="${dist.dir}/simple-test.war" needxmlfile="false">
+      <fileset dir="${webcontent.dir}">
+        <include name="index.html"/>
+      </fileset>
+    </war>
+  </target>
 
 </project>
