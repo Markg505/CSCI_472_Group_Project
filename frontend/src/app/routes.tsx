@@ -12,6 +12,7 @@ import Users from "../pages/Admin/Users";
 import Bookings from "../pages/Admin/Bookings";
 import Menu from "../pages/Admin/Menu";
 import Tables from "../pages/Admin/Tables";
+import Inventory from "../pages/Admin/Inventory";
 import Settings from "../pages/Admin/Settings";
 
 export const router = createBrowserRouter([
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: "bookings", element: <Bookings /> },
           { path: "menu", element: <Menu /> },
           { path: "tables", element: <Tables /> },
+          { path: "inventory", element: <Inventory /> },
           { path: "settings", element: <Settings /> },
         ],
       },
