@@ -48,7 +48,7 @@ export default function AdminShell() {
                       key={item.to}
                       to={item.to}
                       end={item.to === "/admin"}
-                      className={({ isActive }) =>
+                      className={({ isActive }: { isActive: boolean }) =>
                         cx(
                           "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                           isActive
@@ -131,7 +131,7 @@ export default function AdminShell() {
                 as={NavLink}
                 to={item.to}
                 end={item.to === "/admin"}
-                className={({ isActive }) =>
+                className={({ isActive }: { isActive: boolean }) =>
                   cx(
                     "block rounded-md px-3 py-2 text-base font-medium",
                     isActive

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+// import { Link } from "react-router-dom";		!!! ---> Uncomment this when Link is used. (unused imports throw an error in the WAR build)
 
 type Dietary = "veg" | "vegan" | "gf" | "spicy";
 type Dish = {

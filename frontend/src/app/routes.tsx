@@ -42,7 +42,11 @@ export const router = createBrowserRouter([
           { path: "inventory", element: <Inventory /> },
           { path: "settings", element: <Settings /> },
         ],
-      },
-    ],
-  },
-]);
+        },
+      ],
+    },
+  ],
+  {
+    basename: "/RBOS_Web_Deployment"
+  }
+);

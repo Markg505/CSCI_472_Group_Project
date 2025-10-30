@@ -29,7 +29,7 @@ export default function RegisterPage() {
       await signup({
         full_name: v.full_name.trim(),
         email: v.email.trim().toLowerCase(),
-        phone: v.phone?.trim() || undefined,
+        phone: v.phone?.trim() || "",
         password: v.password,
       });
       navigate("/");
