@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-// import { Link } from "react-router-dom";		!!! ---> Uncomment this when Link is used. (unused imports throw an error in the WAR build)
+import { useMemo, useState, useEffect } from "react";
+import { useCart } from "../features/cart/CartContext";
+import { apiClient, type MenuItem } from "../api/client";
 
 type Dietary = "veg" | "vegan" | "gf" | "spicy";
 type Dish = {
@@ -11,7 +12,8 @@ type Dish = {
   dietary?: Dietary[];
   image?: string;
   badge?: string;
-   fit?: "cover" | "contain";
+  fit?: "cover" | "contain";
+  available?: boolean;
 };
 
 const FALLBACK_IMG =
@@ -19,18 +21,18 @@ const FALLBACK_IMG =
 
 const MENU: Dish[] = [
   // Starters
-{
-  id: "burrata",
-  name: "Citrus Burrata",
-  description:
-    "Creamy burrata, blood orange, candied pistachio, basil oil, grilled sourdough.",
-  price: 14,
-  category: "Starters",
-  dietary: ["veg"],
-  image: "https://heinstirred.com/wp-content/uploads/2024/07/CitrusBurrataA.jpg",
-  badge: "Chef’s choice",
-  fit: "contain",
-},
+  {
+    id: "burrata",
+    name: "Citrus Burrata",
+    description:
+      "Creamy burrata, blood orange, candied pistachio, basil oil, grilled sourdough.",
+    price: 14,
+    category: "Starters",
+    dietary: ["veg"],
+    image: "https://heinstirred.com/wp-content/uploads/2024/07/CitrusBurrataA.jpg",
+    badge: "Chef's choice",
+    fit: "contain",
+  },
   {
     id: "crudo",
     name: "Hamachi Crudo",
@@ -137,13 +139,79 @@ const DIET_LABEL: Record<Dietary, string> = {
   spicy: "Spicy",
 };
 
+// ---------- helpers ----------
+function icon(t: Dietary) {
+  switch (t) {
+    case "veg":
+      return "🌿";
+    case "vegan":
+      return "🌱";
+    case "gf":
+      return "💠";
+    case "spicy":
+      return "🌶";
+  }
+}
+
+function groupByCategory(items: Dish[]): [string, Dish[]][] {
+  const map = new Map<string, Dish[]>();
+  for (const d of items) {
+    if (!map.has(d.category)) map.set(d.category, []);
+    map.get(d.category)!.push(d);
+  }
+  const order = new Map(CATEGORIES.map((c, i) => [c, i]));
+  return Array.from(map.entries()).sort(
+    ([a], [b]) => (order.get(a as any) ?? 99) - (order.get(b as any) ?? 99)
+  );
+}
+
 export default function MenuPage() {
+  const { dispatch } = useCart();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("All");
   const [diet, setDiet] = useState<Set<Dietary>>(new Set());
+  const [activeMenuItems, setActiveMenuItems] = useState<MenuItem[]>([]);
+
+  // Load active menu items from API
+  useEffect(() => {
+    const loadMenuItems = async () => {
+      try {
+        const items = await apiClient.getActiveMenuItems();
+        setActiveMenuItems(items);
+      } catch (error) {
+        console.error('Error loading menu items:', error);
+      }
+    };
+    loadMenuItems();
+  }, []);
+
+  const addToCart = (dish: Dish) => {
+    const menuItem: MenuItem = {
+      itemId: parseInt(dish.id.replace(/\D/g, '') || '1'), // Extract numbers from id
+      name: dish.name,
+      price: dish.price,
+      active: true
+    };
+    dispatch({ type: 'ADD_ITEM', payload: menuItem });
+  };
+
+  // Combine static dish data with real menu items
+  const enhancedMenu = useMemo(() => {
+    return MENU.map(dish => {
+      // Try to find matching menu item by name (since IDs don't match)
+      const menuItem = activeMenuItems.find(item => 
+        item.name.toLowerCase() === dish.name.toLowerCase()
+      );
+      return {
+        ...dish,
+        available: menuItem ? menuItem.active : true,
+        actualPrice: menuItem ? menuItem.price : dish.price
+      };
+    });
+  }, [activeMenuItems]);
 
   const filtered = useMemo(() => {
-    let items = MENU;
+    let items = enhancedMenu;
     if (category !== "All") items = items.filter((d) => d.category === category);
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -159,7 +227,7 @@ export default function MenuPage() {
       );
     }
     return items;
-  }, [query, category, diet]);
+  }, [query, category, diet, enhancedMenu]);
 
   function toggleDiet(tag: Dietary) {
     setDiet((prev) => {
@@ -307,8 +375,12 @@ export default function MenuPage() {
                     </div>
 
                     <div className="mt-5 flex items-center justify-between">
-                      <button className="btn-primary rounded-xl px-4 py-2">
-                        Add to order
+                      <button 
+                        className="btn-primary rounded-xl px-4 py-2"
+                        onClick={() => addToCart(d)}
+                        disabled={!d.available}
+                      >
+                        {d.available ? 'Add to order' : 'Unavailable'}
                       </button>
                       <span className="text-xs text-mute">
                         Ask your server for allergens
@@ -322,31 +394,5 @@ export default function MenuPage() {
         ))}
       </section>
     </>
-  );
-}
-
-// ---------- helpers ----------
-function icon(t: Dietary) {
-  switch (t) {
-    case "veg":
-      return "🌿";
-    case "vegan":
-      return "🌱";
-    case "gf":
-      return "💠";
-    case "spicy":
-      return "🌶";
-  }
-}
-
-function groupByCategory(items: Dish[]): [string, Dish[]][] {
-  const map = new Map<string, Dish[]>();
-  for (const d of items) {
-    if (!map.has(d.category)) map.set(d.category, []);
-    map.get(d.category)!.push(d);
-  }
-  const order = new Map(CATEGORIES.map((c, i) => [c, i]));
-  return Array.from(map.entries()).sort(
-    ([a], [b]) => (order.get(a as any) ?? 99) - (order.get(b as any) ?? 99)
   );
 }
