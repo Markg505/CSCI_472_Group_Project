@@ -7,3 +7,6 @@ Thumbs.db
 # Editor
 .vscode/*
 !.vscode/extensions.json
+
+*.db
+!src/main/resources/backend/restaurant.db

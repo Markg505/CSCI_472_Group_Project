@@ -17,30 +17,31 @@ import jakarta.servlet.annotation.*;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 @WebServlet("/api/reservations/*")
 public class ReservationServlet extends HttpServlet {
     private ReservationDAO reservationDAO;
     private DiningTableDAO diningTableDAO;
     private ObjectMapper objectMapper;
-    
+
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         reservationDAO = new ReservationDAO(getServletContext());
         diningTableDAO = new DiningTableDAO(getServletContext());
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
+
             if (pathInfo == null || pathInfo.equals("/")) {
                 // Get all reservations
                 List<Reservation> reservations = reservationDAO.getAllReservations();
@@ -50,16 +51,17 @@ public class ReservationServlet extends HttpServlet {
                 String startUtc = request.getParameter("startUtc");
                 String endUtc = request.getParameter("endUtc");
                 String partySizeStr = request.getParameter("partySize");
-                
+
                 if (startUtc == null || endUtc == null || partySizeStr == null) {
-                    response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing parameters: startUtc, endUtc, partySize");
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                            "Missing parameters: startUtc, endUtc, partySize");
                     return;
                 }
-                
+
                 int partySize = Integer.parseInt(partySizeStr);
                 var availableTables = diningTableDAO.getAvailableTables(startUtc, endUtc, partySize);
                 response.getWriter().write(objectMapper.writeValueAsString(availableTables));
-                
+
             } else {
                 // Get reservation by ID
                 String[] splits = pathInfo.split("/");
@@ -67,10 +69,10 @@ public class ReservationServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
+
                 int reservationId = Integer.parseInt(splits[1]);
                 Reservation reservation = reservationDAO.getReservationById(reservationId);
-                
+
                 if (reservation != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(reservation));
                 } else {
@@ -84,14 +86,14 @@ public class ReservationServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
             Integer reservationId = reservationDAO.createReservation(reservation);
@@ -127,16 +129,14 @@ public class ReservationServlet extends HttpServlet {
                                 reservationTime,
                                 reservation.getPartySize(),
                                 table != null ? table.getName() : "Your table",
-                                reservationId.toString()
-                        );
+                                reservationId.toString());
                     }
 
                     // Notify admin
                     emailService.sendAdminNotification(
                             "New Reservation Created",
                             "New reservation #" + reservationId + " created for " +
-                                    (user != null ? user.getFullName() : "Guest")
-                    );
+                                    (user != null ? user.getFullName() : "Guest"));
 
                 } catch (Exception e) {
                     System.err.println("Failed to send reservation email: " + e.getMessage());
@@ -159,20 +159,53 @@ public class ReservationServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
+            String pathInfo = request.getPathInfo(); // e.g. "/10" or "/10/status"
+            if (pathInfo != null) {
+                String[] parts = pathInfo.split("/"); // ["", "10"] or ["", "10", "status"]
+                if (parts.length == 3 && "status".equals(parts[2])) {
+                    int reservationId = Integer.parseInt(parts[1]);
+
+                    Map<String, Object> body = objectMapper.readValue(request.getReader(), Map.class);
+                    Object statusObj = body.get("status");
+                    if (statusObj == null) {
+                        response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing 'status'");
+                        return;
+                    }
+                    String newStatus = String.valueOf(statusObj);
+
+                    Reservation existing = reservationDAO.getReservationById(reservationId);
+                    if (existing == null) {
+                        response.sendError(HttpServletResponse.SC_NOT_FOUND);
+                        return;
+                    }
+
+                    existing.setStatus(newStatus);
+                    boolean ok = reservationDAO.updateReservation(existing);
+                    if (!ok) {
+                        response.sendError(HttpServletResponse.SC_NOT_FOUND);
+                        return;
+                    }
+
+                    String reservationJson = objectMapper.writeValueAsString(existing);
+                    WebSocketConfig.notifyReservationUpdate(reservationJson);
+                    response.getWriter().write(reservationJson);
+                    return;
+                }
+            }
+
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
             boolean success = reservationDAO.updateReservation(reservation);
 
             if (success) {
-                // Notify via WebSocket
                 String reservationJson = objectMapper.writeValueAsString(reservation);
                 WebSocketConfig.notifyReservationUpdate(reservationJson);
 
@@ -184,6 +217,8 @@ public class ReservationServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             e.printStackTrace();
         } catch (IOException e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        } catch (NumberFormatException e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }

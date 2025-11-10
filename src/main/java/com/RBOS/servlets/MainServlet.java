@@ -6,22 +6,24 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 
-@WebServlet(name = "MainServlet", loadOnStartup = 1, urlPatterns = {"/api/init"})
+@WebServlet(name = "MainServlet", loadOnStartup = 1, urlPatterns = { "/api/init" })
 public class MainServlet extends HttpServlet {
-    
+
     @Override
     public void init() throws ServletException {
         try {
-            // Initialize database on application startup
-            DatabaseConnection.initializeDatabase(getServletContext());
+            try (var conn = DatabaseConnection.getConnection(getServletContext())) {
+                // connection established; seed copy (if missing) already handled inside
+                // DatabaseConnection
+            }
             System.out.println("Application initialized successfully");
         } catch (Exception e) {
             throw new ServletException("Failed to initialize application", e);
         }
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");

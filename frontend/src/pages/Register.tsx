@@ -2,8 +2,6 @@ import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../features/auth/useAuth";
 
-
-
 type FormData = {
   full_name: string;
   email: string;
@@ -19,7 +17,7 @@ export default function RegisterPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>();
-  const { signup } = useAuth(); // expect signup({ full_name, email, phone, password })
+  const { signup } = useAuth(); 
   const navigate = useNavigate();
 
   const pwd = watch("password");
@@ -31,11 +29,13 @@ export default function RegisterPage() {
         email: v.email.trim().toLowerCase(),
         phone: v.phone?.trim() || "",
         password: v.password,
-      });
+      } as any); 
       navigate("/");
     } catch (e: any) {
-      // surface unique-email/validation errors from API
-      alert(e?.response?.data?.message ?? "Registration failed");
+     
+      let msg = "Registration failed";
+      if (e?.message) msg = e.message;
+      alert(msg);
     }
   };
 
@@ -49,11 +49,16 @@ export default function RegisterPage() {
             <label className="block text-sm text-mute mb-1">Full name</label>
             <input
               type="text"
-              {...register("full_name", { required: "Name is required", minLength: { value: 2, message: "Too short" } })}
+              {...register("full_name", {
+                required: "Name is required",
+                minLength: { value: 2, message: "Too short" },
+              })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="Jane Doe"
             />
-            {errors.full_name && <p className="mt-1 text-xs text-red-400">{errors.full_name.message}</p>}
+            {errors.full_name && (
+              <p className="mt-1 text-xs text-red-400">{errors.full_name.message}</p>
+            )}
           </div>
 
           <div>
@@ -62,12 +67,17 @@ export default function RegisterPage() {
               type="email"
               {...register("email", {
                 required: "Email is required",
-                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email" },
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Enter a valid email",
+                },
               })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="you@example.com"
             />
-            {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+            )}
           </div>
 
           <div>
@@ -80,7 +90,9 @@ export default function RegisterPage() {
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="(555) 123-4567"
             />
-            {errors.phone && <p className="mt-1 text-xs text-red-400">{errors.phone.message}</p>}
+            {errors.phone && (
+              <p className="mt-1 text-xs text-red-400">{errors.phone.message}</p>
+            )}
           </div>
 
           <div>
@@ -93,8 +105,11 @@ export default function RegisterPage() {
               })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="••••••••"
+              autoComplete="new-password"
             />
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
+            {errors.password && (
+              <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
+            )}
           </div>
 
           <div>
@@ -103,12 +118,15 @@ export default function RegisterPage() {
               type="password"
               {...register("confirm", {
                 required: "Please confirm your password",
-                validate: (v) => v === pwd || "Passwords do not match",
+                validate: (val) => val === pwd || "Passwords do not match",
               })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="••••••••"
+              autoComplete="new-password"
             />
-            {errors.confirm && <p className="mt-1 text-xs text-red-400">{errors.confirm.message}</p>}
+            {errors.confirm && (
+              <p className="mt-1 text-xs text-red-400">{errors.confirm.message}</p>
+            )}
           </div>
 
           <button className="btn-primary w-full" disabled={isSubmitting}>
@@ -118,7 +136,9 @@ export default function RegisterPage() {
 
         <div className="mt-6 text-center text-sm text-mute">
           Already have an account?{" "}
-          <Link to="/login" className="text-gold hover:underline">Sign in</Link>
+          <Link to="/login" className="text-gold hover:underline">
+            Sign in
+          </Link>
         </div>
       </div>
     </section>

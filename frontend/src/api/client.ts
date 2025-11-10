@@ -1,58 +1,59 @@
-const API_BASE = '/RBOS/api';
+const BASE = (import.meta as any)?.env?.BASE_URL || '/';
+const API_BASE = `${BASE}api`;
 
 export interface User {
-    userId: number;
-    role: 'customer' | 'staff' | 'admin';
-    fullName: string;
-    email: string;
-    phone?: string;
+  userId: number;
+  role: 'customer' | 'staff' | 'admin';
+  fullName: string;
+  email: string;
+  phone?: string;
 }
 
 export interface DiningTable {
-    tableId: number;
-    name: string;
-    capacity: number;
+  tableId: number;
+  name: string;
+  capacity: number;
 }
 
 export interface Reservation {
-    reservationId?: number;
-    userId?: number;
-    tableId: number;
-    startUtc: string;
-    endUtc: string;
-    partySize: number;
-    status?: 'pending' | 'confirmed' | 'cancelled' | 'no_show';
-    notes?: string;
-    createdUtc?: string;
+  reservationId?: number;
+  userId?: number;
+  tableId: number;
+  startUtc: string;
+  endUtc: string;
+  partySize: number;
+  status?: 'pending' | 'confirmed' | 'cancelled' | 'no_show';
+  notes?: string;
+  createdUtc?: string;
 }
 
 export interface MenuItem {
-    itemId: number;
-    name: string;
-    price: number;
-    active: boolean;
+  itemId: number;
+  name: string;
+  price: number;
+  active: boolean;
 }
 
 export interface Order {
-    orderId?: number;
-    userId?: number;
-    source: 'web' | 'phone' | 'walkin';
-    status: 'cart' | 'placed' | 'paid' | 'cancelled';
-    subtotal: number;
-    tax: number;
-    total: number;
-    createdUtc?: string;
-    orderItems?: OrderItem[];
+  orderId?: number;
+  userId?: number;
+  source: 'web' | 'phone' | 'walkin';
+  status: 'cart' | 'placed' | 'paid' | 'cancelled';
+  subtotal: number;
+  tax: number;
+  total: number;
+  createdUtc?: string;
+  orderItems?: OrderItem[];
 }
 
 export interface OrderItem {
-    orderItemId?: number;
-    orderId?: number;
-    itemId: number;
-    qty: number;
-    unitPrice: number;
-    lineTotal: number;
-    notes?: string;
+  orderItemId?: number;
+  orderId?: number;
+  itemId: number;
+  qty: number;
+  unitPrice: number;
+  lineTotal: number;
+  notes?: string;
 }
 
 export interface ReportMetrics {
@@ -104,25 +105,28 @@ export interface MenuPerformance {
 }
 
 class ApiClient {
-  private baseURL = '/RBOS/api';
+  private baseURL = API_BASE;
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       headers: {
-        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...options.headers,
       },
       ...options,
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const text = await response.text().catch(() => '');
+      throw new Error(`API error: ${response.status}${text ? ` ${text}` : ''}`);
     }
 
-    return response.json();
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return response.json();
+    return null;
   }
 
-  // User methods
   async getUserByEmail(email: string): Promise<User> {
     return this.request(`/users/email/${encodeURIComponent(email)}`);
   }
@@ -135,12 +139,9 @@ class ApiClient {
   }
 
   async deleteUser(userId: number): Promise<void> {
-    await this.request(`/users/${userId}`, {
-      method: 'DELETE',
-    });
+    await this.request(`/users/${userId}`, { method: 'DELETE' });
   }
 
-  // Dining table methods
   async getTables(): Promise<DiningTable[]> {
     return this.request('/tables');
   }
@@ -151,29 +152,19 @@ class ApiClient {
   }
 
   async createTable(table: Omit<DiningTable, 'tableId'>): Promise<DiningTable> {
-    return this.request('/tables', {
-      method: 'POST',
-      body: JSON.stringify(table),
-    });
+    return this.request('/tables', { method: 'POST', body: JSON.stringify(table) });
   }
 
   async updateTable(table: DiningTable): Promise<DiningTable> {
-    return this.request(`/tables/${table.tableId}`, {
-      method: 'PUT',
-      body: JSON.stringify(table),
-    });
+    return this.request(`/tables/${table.tableId}`, { method: 'PUT', body: JSON.stringify(table) });
   }
 
-  // Reservation methods
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
   }
 
   async createReservation(reservation: Reservation): Promise<Reservation> {
-    return this.request('/reservations', {
-      method: 'POST',
-      body: JSON.stringify(reservation),
-    });
+    return this.request('/reservations', { method: 'POST', body: JSON.stringify(reservation) });
   }
 
   async updateReservation(reservation: Reservation): Promise<Reservation> {
@@ -182,14 +173,23 @@ class ApiClient {
       body: JSON.stringify(reservation),
     });
   }
+async deleteReservation(reservationId: number): Promise<void> {
+  await this.request(`/reservations/${reservationId}`, { method: 'DELETE' });
+}
 
+async getReservationsForUser(userId: number) {
+
+  const all = await this.getReservations();
+  return (all || []).filter(r => r.userId === userId);
+}
   async updateReservationStatus(reservationId: number, status: string): Promise<Reservation> {
-    return this.request(`/reservations/${reservationId}?status=${status}`, {
+    return this.request(`/reservations/${reservationId}/status`, {
       method: 'PUT',
+      body: JSON.stringify({ status }),
     });
   }
 
-  // Menu methods
+
   async getMenuItems(): Promise<MenuItem[]> {
     return this.request('/menu');
   }
@@ -199,31 +199,19 @@ class ApiClient {
   }
 
   async createMenuItem(menuItem: Omit<MenuItem, 'itemId'>): Promise<MenuItem> {
-    return this.request('/menu', {
-      method: 'POST',
-      body: JSON.stringify(menuItem),
-    });
+    return this.request('/menu', { method: 'POST', body: JSON.stringify(menuItem) });
   }
 
   async updateMenuItem(menuItem: MenuItem): Promise<MenuItem> {
-    return this.request(`/menu/${menuItem.itemId}`, {
-      method: 'PUT',
-      body: JSON.stringify(menuItem),
-    });
+    return this.request(`/menu/${menuItem.itemId}`, { method: 'PUT', body: JSON.stringify(menuItem) });
   }
 
   async deleteMenuItem(itemId: number): Promise<void> {
-    await this.request(`/menu/${itemId}`, {
-      method: 'DELETE',
-    });
+    await this.request(`/menu/${itemId}`, { method: 'DELETE' });
   }
 
-  // Order methods
   async createOrder(order: Order): Promise<Order> {
-    return this.request('/orders', {
-      method: 'POST',
-      body: JSON.stringify(order),
-    });
+    return this.request('/orders', { method: 'POST', body: JSON.stringify(order) });
   }
 
   async getOrdersByStatus(status: string): Promise<Order[]> {
@@ -235,25 +223,20 @@ class ApiClient {
   }
 
   async updateOrderStatus(orderId: number, status: string): Promise<Order> {
-    return this.request(`/orders/${orderId}/status?status=${status}`, {
+    return this.request(`/orders/${orderId}/status`, {
       method: 'PUT',
+      body: JSON.stringify({ status }),
     });
   }
 
   async updateOrder(order: Order): Promise<Order> {
-    return this.request(`/orders/${order.orderId}`, {
-      method: 'PUT',
-      body: JSON.stringify(order),
-    });
+    return this.request(`/orders/${order.orderId}`, { method: 'PUT', body: JSON.stringify(order) });
   }
 
   async deleteOrder(orderId: number): Promise<void> {
-    await this.request(`/orders/${orderId}`, {
-      method: 'DELETE',
-    });
+    await this.request(`/orders/${orderId}`, { method: 'DELETE' });
   }
 
-  // Analytics Methods
   async getDashboardMetrics(): Promise<ReportMetrics> {
     return this.request('/reports/dashboard-metrics');
   }

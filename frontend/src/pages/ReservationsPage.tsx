@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
-import { apiClient, type DiningTable } from '../api/client';
+import { apiClient, type DiningTable, type Reservation } from '../api/client';
 import { useAuth } from '../features/auth/useAuth';
 
 export default function ReservationsPage() {
   const { user } = useAuth();
+  const uid: number = (user as any)?.userId ?? (user as any)?.id ?? 0;
+
   const [submitting, setSubmitting] = useState(false);
   const [availableTables, setAvailableTables] = useState<DiningTable[]>([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [myReservations, setMyReservations] = useState<Reservation[]>([]);
+  const [editing, setEditing] = useState<Record<number, Reservation>>({});
   const [form, setForm] = useState({
-    userId: user?.id || 0,
-    tableId: 0,
+    userId: uid,
+    tableId: 0 as number | '',
     startUtc: '',
     endUtc: '',
     partySize: '2',
@@ -41,27 +45,42 @@ export default function ReservationsPage() {
     return () => clearTimeout(timeoutId);
   }, [form.startUtc, form.endUtc, form.partySize]);
 
+  useEffect(() => {
+    setForm(f => ({ ...f, userId: uid }));
+  }, [uid]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await apiClient.getReservations();
+        const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+        setMyReservations(mine);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [uid]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
-      const reservationData = {
-        userId: user?.id,
-        tableId: parseInt(form.tableId.toString()),
+      const reservationData: Reservation = {
+        userId: uid,
+        tableId: Number(form.tableId),
         startUtc: form.startUtc,
         endUtc: form.endUtc,
         partySize: parseInt(form.partySize),
         notes: form.notes,
-        status: 'pending' as const
+        status: 'pending'
       };
 
       await apiClient.createReservation(reservationData);
       alert('Reservation request sent! We will confirm shortly.');
       
-      // Reset form
       setForm({
-        userId: user?.id || 0,
+        userId: uid,
         tableId: 0,
         startUtc: '',
         endUtc: '',
@@ -69,6 +88,9 @@ export default function ReservationsPage() {
         notes: '',
       });
       setAvailableTables([]);
+      const all = await apiClient.getReservations();
+      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+      setMyReservations(mine);
     } catch (error) {
       console.error('Error creating reservation:', error);
       alert('Failed to create reservation. Please try again.');
@@ -77,7 +99,7 @@ export default function ReservationsPage() {
     }
   };
 
-  const updateForm = (key: string, val: string) => {
+  const updateForm = (key: string, val: any) => {
     setForm(prev => ({ ...prev, [key]: val }));
   };
 
@@ -85,6 +107,46 @@ export default function ReservationsPage() {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     return now.toISOString().slice(0, 16);
+  };
+
+  const startEdit = (r: Reservation) => {
+    if (!r.reservationId) return;
+    setEditing(prev => ({ ...prev, [r.reservationId!]: { ...r } }));
+  };
+
+  const changeEdit = (id: number, patch: Partial<Reservation>) => {
+    setEditing(prev => ({ ...prev, [id]: { ...(prev[id] || {} as Reservation), ...patch } }));
+  };
+
+  const saveEdit = async (id: number) => {
+    const draft = editing[id];
+    if (!draft) return;
+    try {
+      await apiClient.updateReservation(draft);
+      setEditing(prev => { const c = { ...prev }; delete c[id]; return c; });
+      const all = await apiClient.getReservations();
+      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+      setMyReservations(mine);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save changes.');
+    }
+  };
+
+  const cancelEdit = (id: number) => {
+    setEditing(prev => { const c = { ...prev }; delete c[id]; return c; });
+  };
+
+  const cancelReservation = async (id: number) => {
+    try {
+      await apiClient.updateReservationStatus(id, 'cancelled');
+      const all = await apiClient.getReservations();
+      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+      setMyReservations(mine);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to cancel reservation.');
+    }
   };
 
   return (
@@ -200,6 +262,128 @@ export default function ReservationsPage() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-12">
+              <h4 className="text-xl font-semibold mb-3">My Reservations</h4>
+              {myReservations.length === 0 ? (
+                <div className="text-sm text-neutral-500">You have no reservations yet.</div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left">ID</th>
+                        <th className="px-3 py-2 text-left">Table</th>
+                        <th className="px-3 py-2 text-left">Start</th>
+                        <th className="px-3 py-2 text-left">End</th>
+                        <th className="px-3 py-2 text-left">Party</th>
+                        <th className="px-3 py-2 text-left">Status</th>
+                        <th className="px-3 py-2 text-left">Notes</th>
+                        <th className="px-3 py-2 text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {myReservations.map(r => {
+                        const id = r.reservationId!;
+                        const ed = editing[id];
+                        const isEditing = !!ed;
+                        return (
+                          <tr key={id}>
+                            <td className="px-3 py-2">{id}</td>
+                            <td className="px-3 py-2">Table {r.tableId}</td>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <input
+                                  type="datetime-local"
+                                  value={ed.startUtc?.slice(0,16) || ''}
+                                  onChange={(e)=>changeEdit(id,{ startUtc: e.target.value })}
+                                  className="input"
+                                />
+                              ) : new Date(r.startUtc).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <input
+                                  type="datetime-local"
+                                  value={ed.endUtc?.slice(0,16) || ''}
+                                  onChange={(e)=>changeEdit(id,{ endUtc: e.target.value })}
+                                  className="input"
+                                />
+                              ) : new Date(r.endUtc).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <input
+                                  type="number" min={1} max={20}
+                                  value={ed.partySize || 1}
+                                  onChange={(e)=>changeEdit(id,{ partySize: Number(e.target.value) })}
+                                  className="input w-20"
+                                />
+                              ) : r.partySize}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                r.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                                r.status === 'pending'   ? 'bg-yellow-100 text-yellow-800' :
+                                r.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={ed.notes || ''}
+                                  onChange={(e)=>changeEdit(id,{ notes: e.target.value })}
+                                  className="input"
+                                />
+                              ) : (r.notes || '—')}
+                            </td>
+                            <td className="px-3 py-2 space-x-2">
+                              {!isEditing ? (
+                                <>
+                                  <button
+                                    className="rounded-md border px-2 py-1"
+                                    onClick={()=>startEdit(r)}
+                                    disabled={r.status === 'cancelled'}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="rounded-md border px-2 py-1"
+                                    onClick={()=>cancelReservation(id)}
+                                    disabled={r.status === 'cancelled'}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    className="rounded-md border px-2 py-1 bg-indigo-600 text-white"
+                                    onClick={()=>saveEdit(id)}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="rounded-md border px-2 py-1"
+                                    onClick={()=>cancelEdit(id)}
+                                  >
+                                    Close
+                                  </button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
