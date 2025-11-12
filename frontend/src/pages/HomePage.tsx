@@ -13,7 +13,7 @@ export default function HomePage() {
           <div className="max-w-2xl">
             <h1 className="h1">Restaurant <span className="text-gold">GEM</span></h1>
             <p className="mt-6 text-lg md:text-xl text-mute">
-              Seasonal tasting menus crafted with precision. Reserve your table and let us take care of the rest(RBOS).
+              Seasonal tasting menus crafted with precision. Reserve your table and let us take care of the rest
             </p>
             <div className="mt-8 flex gap-3">
               <a href="/reservations" className="btn-primary">Reserve a table</a>
