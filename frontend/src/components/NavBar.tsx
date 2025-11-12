@@ -53,7 +53,7 @@ export default function NavBar() {
         <div className="md:hidden border-t border-white/10">
           <div className="container-xl py-3 flex flex-col gap-2">
             <Link to="/" onClick={() => setOpen(false)}>Home</Link>
-            <Link to="/menu" onClick={() => setOpen(false)}>Menu</Link>
+            <Link to="/pages/menu" onClick={() => setOpen(false)}>Menu</Link>
             <Link to="/reservations" onClick={() => setOpen(false)}>Reservations</Link>
             {user?.role !== "CUSTOMER" && <Link to="/admin" onClick={() => setOpen(false)}>Admin</Link>}
             {user ? (

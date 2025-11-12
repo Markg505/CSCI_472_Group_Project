@@ -113,7 +113,7 @@ function todayISO(): string {
 function seed(): InventoryItem[] {
   const rows: InventoryItem[] = [
     {
-      id: crypto.randomUUID(),
+      id: "111111",
       name: "Brioche Buns",
       sku: "BN-BRIOCHE-12",
       category: "Bakery",
@@ -138,7 +138,7 @@ function seed(): InventoryItem[] {
       conversion: "1 case = 12 each",
     },
     {
-      id: crypto.randomUUID(),
+      id: "111112",
       name: "Ground Beef 80/20",
       sku: "MEAT-GB80-5LB",
       category: "Meat",

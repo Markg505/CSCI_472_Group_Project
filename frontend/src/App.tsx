@@ -1,18 +1,27 @@
-import { Outlet } from "react-router-dom";
-import NavBar from "./components/NavBar";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { CartProvider } from './features/cart/CartContext';
+import { NotificationProvider } from './features/notifications/NotificationContext';
+import HomePage from './pages/HomePage';
+import CustomerMenu from './pages/CustomerMenu';
+import ReservationsPage from './pages/ReservationsPage';
+import CartPage from './pages/CartPage';
+import AdminLayout from './pages/Admin/AdminLayout';
+import './index.css';
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <NavBar />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <footer className="border-t border-white/10">
-        <div className="container-xl py-10 text-sm text-mute">
-          © {new Date().getFullYear()} RBOS
-        </div>
-      </footer>
-    </div>
+    <CartProvider>
+      <NotificationProvider>
+          <div className="App">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/menu" element={<CustomerMenu />} />
+              <Route path="/reservations" element={<ReservationsPage />} />
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/admin/*" element={<AdminLayout />} />
+            </Routes>
+          </div>
+      </NotificationProvider>
+    </CartProvider>
   );
 }
