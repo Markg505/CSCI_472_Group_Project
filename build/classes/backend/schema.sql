@@ -219,4 +219,32 @@ INSERT INTO order_items VALUES
   (15, 8,11, 1,  7.95,  7.95, ''),
   (16, 8,12, 1,  0.00,  0.00, 'free drink coupon');
 
+--inventory
+CREATE TABLE inventory (
+  inventory_id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  sku TEXT UNIQUE,                
+  category TEXT,
+  unit TEXT NOT NULL CHECK (unit IN 'each', 'lb','oz','case','bag'),                
+  packSize INTEGER,          
+  qtyOnHand INTEGER,
+  parLevel INTEGER,            
+  reorderPoinT INTEGER,        
+  cost REAL NOT NULL CHECK (unit_price >= 0),            
+  location TEXT,          
+  active BOOLEAN DEFAULT 1,
+  vendor TEXT,              
+  leadTimeDays INTEGER,
+  preferredOrderQty INTEGER,
+  wasteQty INTEGER,            
+  lastCountedAt INTEGER,    
+  countFreq INTEGER,        
+  lot TEXT,                
+  expiryDate TEXT,        
+  allergen TEXT NOT NULL CHECK (allergen IN ('none', 'gluten', 'dairy', 'eggs', 'soy', 'peanuts', 'tree-nuts', 'shellfish', 'fish', 'sesame')),          
+  conversion TEXT          
+);
+
+
+
 COMMIT;
