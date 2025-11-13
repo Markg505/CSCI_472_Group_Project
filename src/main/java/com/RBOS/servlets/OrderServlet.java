@@ -2,10 +2,14 @@ package com.RBOS.servlets;
 
 import com.RBOS.dao.OrderDAO;
 import com.RBOS.dao.OrderItemDAO;
+import com.RBOS.dao.InventoryDAO;
+import com.RBOS.models.Inventory;
 import com.RBOS.models.Order;
+import com.RBOS.models.OrderItem;
 import com.RBOS.services.EmailService;
 import com.RBOS.dao.UserDAO;
 import com.RBOS.models.User;
+import com.RBOS.utils.DatabaseConnection;
 import com.RBOS.websocket.WebSocketConfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,8 +18,14 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static com.fasterxml.jackson.databind.type.LogicalType.Map;
 
 @WebServlet("/api/orders/*")
 public class OrderServlet extends HttpServlet {
@@ -59,8 +69,8 @@ public class OrderServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
-                int userId = Integer.parseInt(splits[2]);
+
+                String userId = splits[2];
                 List<Order> userOrders = orderDAO.getOrdersByUser(userId);
                 response.getWriter().write(objectMapper.writeValueAsString(userOrders));
                 
@@ -83,8 +93,8 @@ public class OrderServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
-                int orderId = Integer.parseInt(splits[1]);
+
+                String orderId = splits[1];
                 Order order = orderDAO.getOrderById(orderId);
                 
                 if (order != null) {
@@ -100,77 +110,140 @@ public class OrderServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
+        Connection conn = null;
         try {
+            conn = DatabaseConnection.getConnection(getServletContext());
+            conn.setAutoCommit(false);
+
             Order order = objectMapper.readValue(request.getReader(), Order.class);
-            Integer orderId = orderDAO.createOrder(order);
+            InventoryDAO inventoryDAO = new InventoryDAO(getServletContext());
 
-            if (orderId != null) {
-                order.setOrderId(orderId);
+            // Validate inventory and calculate totals
+            double subtotal = 0;
+            List<String> outOfStockItems = new ArrayList<>();
 
-                // Recalculate totals after creating order items
-                orderDAO.recalculateOrderTotals(orderId);
-
-                // Fetch the complete order with recalculated totals
-                Order completeOrder = orderDAO.getOrderById(orderId);
-
-                // Send confirmation email
-                try {
-                    EmailService emailService = new EmailService();
-
-                    // Get user details for email
-                    UserDAO userDAO = new UserDAO(getServletContext());
-                    User user = null;
-                    if (order.getUserId() != null) {
-                        user = userDAO.getUserById(order.getUserId());
-                    }
-
-                    if (user != null && user.getEmail() != null) {
-                        // Calculate estimated ready time (30-45 minutes from now)
-                        String estimatedTime = new java.text.SimpleDateFormat("h:mm a")
-                                .format(new java.util.Date(System.currentTimeMillis() + 45 * 60 * 1000));
-
-                        emailService.sendOrderConfirmation(
-                            user.getEmail(),
-                            user.getFullName(),
-                            String.valueOf(orderId),
-                            order.getTotal(),
-                            estimatedTime
-                        );
-                    }
-
-                    // Notify admin
-                    emailService.sendAdminNotification(
-                            "New Order Received",
-                            "New order #" + orderId + " received with total: $" + order.getTotal()
-                    );
-
-                } catch (Exception e) {
-                    System.err.println("Failed to send order email: " + e.getMessage());
-                    // Don't fail the request if email fails
+            for (OrderItem item : order.getOrderItems()) {
+                Inventory inventory = inventoryDAO.getInventoryByItemId(item.getItemId());
+                
+                if (inventory == null || !inventory.getActive()) {
+                    outOfStockItems.add("Item not available: " + item.getItemId());
+                    continue;
                 }
 
-                // Notify via WebSocket
-                String orderJson = objectMapper.writeValueAsString(order);
-                WebSocketConfig.notifyNewOrder(orderJson);
+                if (inventory.getQtyOnHand() < item.getQty()) {
+                    outOfStockItems.add("Insufficient stock for: " + inventory.getName() + 
+                        " (Available: " + inventory.getQtyOnHand() + ", Requested: " + item.getQty() + ")");
+                    continue;
+                }
 
+                // Calculate line total
+                item.setLineTotal(item.getQty() * item.getUnitPrice());
+                subtotal += item.getLineTotal();
+            }
+
+            if (!outOfStockItems.isEmpty()) {
+                conn.rollback();
+                response.setStatus(HttpServletResponse.SC_CONFLICT);
+
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Inventory issues");
+                errorResponse.put("details", outOfStockItems);
+
+                response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+                return;
+            }
+
+            // Set order totals
+            double tax = subtotal * 0.08;
+            double total = subtotal + tax;
+            order.setSubtotal(subtotal);
+            order.setTax(tax);
+            order.setTotal(total);
+
+            // Create order
+            String orderId = orderDAO.createOrder(order);
+            
+            if (orderId != null) {
+                order.setOrderId(orderId);
+                
+                // Update inventory
+                for (OrderItem item : order.getOrderItems()) {
+                    boolean success = inventoryDAO.decrementInventory(item.getItemId(), item.getQty());
+                    if (!success) {
+                        conn.rollback();
+                        response.sendError(HttpServletResponse.SC_CONFLICT,
+                                "Failed to update inventory for item: " + item.getItemId());
+                        return;
+                    }
+                }
+                
+                conn.commit();
+                
+                // Send notifications
+                sendOrderNotifications(order);
+                
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(order));
             } else {
+                conn.rollback();
                 response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             }
-        } catch (SQLException e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+        } catch (Exception e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) {}
+            }
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
             e.printStackTrace();
-        } catch (IOException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) {}
+            }
+        }
+    }
+
+    private void sendOrderNotifications(Order order) {
+        try {
+            EmailService emailService = new EmailService();
+            UserDAO userDAO = new UserDAO(getServletContext());
+
+            if (order.getUserId() != null) {
+                User user = userDAO.getUserById(order.getUserId());
+                if (user != null && user.getEmail() != null) {
+                    String estimatedTime = new java.text.SimpleDateFormat("h:mm a")
+                            .format(new java.util.Date(System.currentTimeMillis() + 45 * 60 * 1000));
+
+                    emailService.sendOrderConfirmation(
+                            user.getEmail(),
+                            user.getFullName(),
+                            String.valueOf(order.getOrderId()),
+                            order.getTotal(),
+                            estimatedTime
+                    );
+                }
+            }
+
+            emailService.sendAdminNotification(
+                    "New Order Received",
+                    String.format("Order #%d - Total: $%.2f", order.getOrderId(), order.getTotal())
+            );
+
+            String orderJson = objectMapper.writeValueAsString(order);
+            WebSocketConfig.notifyNewOrder(orderJson);
+
+        } catch (Exception e) {
+            System.err.println("Failed to send order notifications: " + e.getMessage());
         }
     }
     
@@ -189,7 +262,7 @@ public class OrderServlet extends HttpServlet {
             }
             
             String[] pathParts = pathInfo.split("/");
-            int orderId = Integer.parseInt(pathParts[1]);
+            String orderId = pathParts[1];
             
             if (pathParts.length == 3 && "status".equals(pathParts[2])) {
                 // Update only order status
@@ -272,8 +345,8 @@ public class OrderServlet extends HttpServlet {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
-            int orderId = Integer.parseInt(pathInfo.split("/")[1]);
+
+            String orderId = pathInfo.split("/")[1];
             boolean success = orderDAO.deleteOrder(orderId);
             
             if (success) {

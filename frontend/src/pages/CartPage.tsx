@@ -10,11 +10,11 @@ export default function CartPage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
-  const updateQuantity = (itemId: number, qty: number) => {
+  const updateQuantity = (itemId: string, qty: number) => {
     dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, qty } });
   };
 
-  const removeItem = (itemId: number) => {
+  const removeItem = (itemId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: itemId });
   };
 
@@ -37,7 +37,7 @@ export default function CartPage() {
         orderItems: state.items.map(item => ({
           itemId: item.itemId,
           qty: item.qty,
-          unitPrice: item.unitPrice,
+          unitPrice: item.price,
           lineTotal: item.lineTotal,
           notes: item.notes
         }))
@@ -81,8 +81,8 @@ export default function CartPage() {
           {state.items.map(item => (
             <div key={item.itemId} className="flex items-center justify-between p-4 border border-white/10 rounded-xl">
               <div className="flex-1">
-                <h3 className="font-medium">{item.itemName}</h3>
-                <p className="text-sm text-mute">${item.unitPrice.toFixed(2)} each</p>
+                <h3 className="font-medium">{item.name}</h3>
+                <p className="text-sm text-mute">${item.price.toFixed(2)} each</p>
               </div>
               
               <div className="flex items-center gap-4">

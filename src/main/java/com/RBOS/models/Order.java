@@ -3,8 +3,8 @@ package com.RBOS.models;
 import java.util.List;
 
 public class Order {
-    private Integer orderId;
-    private Integer userId;
+    private String orderId;
+    private String userId;
     private String source; // 'web', 'phone', 'walkin'
     private String status; // 'cart', 'placed', 'paid', 'cancelled'
     private Double subtotal;
@@ -18,7 +18,7 @@ public class Order {
 
     public Order() {}
 
-    public Order(Integer orderId, Integer userId, String source, String status, 
+    public Order(String orderId, String userId, String source, String status,
                 Double subtotal, Double tax, Double total, String createdUtc) {
         this.orderId = orderId;
         this.userId = userId;
@@ -31,11 +31,11 @@ public class Order {
     }
 
     // Getters and setters
-    public Integer getOrderId() { return orderId; }
-    public void setOrderId(Integer orderId) { this.orderId = orderId; }
+    public String getOrderId() { return orderId; }
+    public void setOrderId(String orderId) { this.orderId = orderId; }
 
-    public Integer getUserId() { return userId; }
-    public void setUserId(Integer userId) { this.userId = userId; }
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }

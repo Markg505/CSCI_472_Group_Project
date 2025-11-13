@@ -31,7 +31,7 @@ export default function OrdersAdmin() {
     }
   };
 
-  const handleStatusUpdate = async (orderId: number, newStatus: string) => {
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
       await apiClient.updateOrderStatus(orderId, newStatus);
       await loadOrders(); // Refresh the list

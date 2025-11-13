@@ -70,7 +70,7 @@ public class ReservationServlet extends HttpServlet {
                     return;
                 }
 
-                int reservationId = Integer.parseInt(splits[1]);
+                String reservationId = splits[1];
                 Reservation reservation = reservationDAO.getReservationById(reservationId);
 
                 if (reservation != null) {
@@ -96,7 +96,7 @@ public class ReservationServlet extends HttpServlet {
 
         try {
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
-            Integer reservationId = reservationDAO.createReservation(reservation);
+            String reservationId = reservationDAO.createReservation(reservation);
 
             if (reservationId != null) {
                 reservation.setReservationId(reservationId);
@@ -172,7 +172,7 @@ public class ReservationServlet extends HttpServlet {
             if (pathInfo != null) {
                 String[] parts = pathInfo.split("/"); // ["", "10"] or ["", "10", "status"]
                 if (parts.length == 3 && "status".equals(parts[2])) {
-                    int reservationId = Integer.parseInt(parts[1]);
+                    String reservationId = parts[1];
 
                     Map<String, Object> body = objectMapper.readValue(request.getReader(), Map.class);
                     Object statusObj = body.get("status");

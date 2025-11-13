@@ -348,7 +348,7 @@ public class ReportServlet extends HttpServlet {
         });
         
         // Customer loyalty (reservations per customer)
-        Map<Integer, Long> reservationsPerCustomer = reservations.stream()
+        Map<String, Long> reservationsPerCustomer = reservations.stream()
             .filter(r -> r.getUserId() != null)
             .collect(Collectors.groupingBy(
                 Reservation::getUserId,
@@ -387,8 +387,8 @@ public class ReportServlet extends HttpServlet {
         List<MenuItem> menuItems = menuItemDAO.getAllMenuItems();
         
         // Get all order items
-        Map<Integer, Double> itemRevenue = new HashMap<>();
-        Map<Integer, Long> itemQuantity = new HashMap<>();
+        Map<String, Double> itemRevenue = new HashMap<>();
+        Map<String, Long> itemQuantity = new HashMap<>();
         
         for (Order order : orders) {
             if (order.getOrderItems() != null) {
@@ -401,7 +401,7 @@ public class ReportServlet extends HttpServlet {
         
         // Top performing items by revenue
         itemRevenue.entrySet().stream()
-            .sorted(Map.Entry.<Integer, Double>comparingByValue().reversed())
+            .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
             .limit(10)
             .forEach(entry -> {
                 ObjectNode itemNode = objectMapper.createObjectNode();

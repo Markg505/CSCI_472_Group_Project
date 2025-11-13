@@ -59,8 +59,8 @@ public class UserServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
-                int userId = Integer.parseInt(splits[1]);
+
+                String userId = splits[1];
                 User user = userDAO.getUserById(userId);
                 
                 if (user != null) {
@@ -86,7 +86,7 @@ public class UserServlet extends HttpServlet {
         
         try {
             User user = objectMapper.readValue(request.getReader(), User.class);
-            Integer userId = userDAO.createUser(user);
+            String userId = userDAO.createUser(user);
             
             if (userId != null) {
                 user.setUserId(userId);
@@ -120,8 +120,8 @@ public class UserServlet extends HttpServlet {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
-            int userId = Integer.parseInt(pathInfo.split("/")[1]);
+
+            String userId = pathInfo.split("/")[1];
             User user = objectMapper.readValue(request.getReader(), User.class);
             user.setUserId(userId); // Ensure the ID matches the path
             
@@ -150,8 +150,8 @@ public class UserServlet extends HttpServlet {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
-            int userId = Integer.parseInt(pathInfo.split("/")[1]);
+
+            String userId = pathInfo.split("/")[1];
             boolean success = userDAO.deleteUser(userId);
             
             if (success) {

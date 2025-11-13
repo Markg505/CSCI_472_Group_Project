@@ -1,9 +1,9 @@
 package com.RBOS.models;
 
 public class Reservation {
-    private Integer reservationId;
-    private Integer userId;
-    private Integer tableId;
+    private String reservationId;
+    private String userId;
+    private String tableId;
     private String startUtc;
     private String endUtc;
     private Integer partySize;
@@ -17,7 +17,7 @@ public class Reservation {
 
     public Reservation() {}
 
-    public Reservation(Integer reservationId, Integer userId, Integer tableId, 
+    public Reservation(String reservationId, String userId, String tableId,
                       String startUtc, String endUtc, Integer partySize, 
                       String status, String notes, String createdUtc) {
         this.reservationId = reservationId;
@@ -32,14 +32,14 @@ public class Reservation {
     }
 
     // Getters and setters
-    public Integer getReservationId() { return reservationId; }
-    public void setReservationId(Integer reservationId) { this.reservationId = reservationId; }
+    public String getReservationId() { return reservationId; }
+    public void setReservationId(String reservationId) { this.reservationId = reservationId; }
 
-    public Integer getUserId() { return userId; }
-    public void setUserId(Integer userId) { this.userId = userId; }
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
-    public Integer getTableId() { return tableId; }
-    public void setTableId(Integer tableId) { this.tableId = tableId; }
+    public String getTableId() { return tableId; }
+    public void setTableId(String tableId) { this.tableId = tableId; }
 
     public String getStartUtc() { return startUtc; }
     public void setStartUtc(String startUtc) { this.startUtc = startUtc; }

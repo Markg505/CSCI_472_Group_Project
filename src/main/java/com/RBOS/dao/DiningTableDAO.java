@@ -24,7 +24,7 @@ public class DiningTableDAO {
             
             while (rs.next()) {
                 tables.add(new DiningTable(
-                    rs.getInt("table_id"),
+                    rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
                 ));
@@ -33,18 +33,18 @@ public class DiningTableDAO {
         return tables;
     }
     
-    public DiningTable getTableById(int tableId) throws SQLException {
+    public DiningTable getTableById(String tableId) throws SQLException {
         String sql = "SELECT * FROM dining_tables WHERE table_id = ?";
         
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            pstmt.setInt(1, tableId);
+            pstmt.setString(1, tableId);
             ResultSet rs = pstmt.executeQuery();
             
             if (rs.next()) {
                 return new DiningTable(
-                    rs.getInt("table_id"),
+                    rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
                 );
@@ -84,7 +84,7 @@ public class DiningTableDAO {
             
             while (rs.next()) {
                 tables.add(new DiningTable(
-                    rs.getInt("table_id"),
+                    rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
                 ));
@@ -93,7 +93,7 @@ public class DiningTableDAO {
         return tables;
     }
     
-    public Integer createTable(DiningTable table) throws SQLException {
+    public String createTable(DiningTable table) throws SQLException {
         String sql = "INSERT INTO dining_tables (name, capacity) VALUES (?, ?)";
         
         try (Connection conn = DatabaseConnection.getConnection(context);
@@ -107,7 +107,7 @@ public class DiningTableDAO {
             if (affectedRows > 0) {
                 try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
                     if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
+                        return generatedKeys.getString(1);
                     }
                 }
             }
@@ -123,7 +123,7 @@ public class DiningTableDAO {
             
             pstmt.setString(1, table.getName());
             pstmt.setInt(2, table.getCapacity());
-            pstmt.setInt(3, table.getTableId());
+            pstmt.setString(3, table.getTableId());
             
             return pstmt.executeUpdate() > 0;
         }

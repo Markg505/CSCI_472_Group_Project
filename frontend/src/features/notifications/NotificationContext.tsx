@@ -75,7 +75,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     unreadCount: 0
   });
   
-  const { lastMessage } = useWebSocket('/RBOS/realtime');
+  const { lastMessage } = useWebSocket();
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {

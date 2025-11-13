@@ -43,8 +43,8 @@ public class DiningTableServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
-                int tableId = Integer.parseInt(splits[1]);
+
+                String tableId = splits[1];
                 DiningTable table = diningTableDAO.getTableById(tableId);
                 
                 if (table != null) {
@@ -70,7 +70,7 @@ public class DiningTableServlet extends HttpServlet {
         
         try {
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
-            Integer tableId = diningTableDAO.createTable(table);
+            String tableId = diningTableDAO.createTable(table);
             
             if (tableId != null) {
                 table.setTableId(tableId);
@@ -100,8 +100,8 @@ public class DiningTableServlet extends HttpServlet {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
-            int tableId = Integer.parseInt(pathInfo.split("/")[1]);
+
+            String tableId = pathInfo.split("/")[1];
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
             table.setTableId(tableId); // Ensure the ID matches the path
             

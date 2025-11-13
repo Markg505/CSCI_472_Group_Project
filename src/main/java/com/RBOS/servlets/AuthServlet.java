@@ -29,11 +29,11 @@ public class AuthServlet extends HttpServlet {
                 mapper.writeValue(resp.getWriter(), new Msg("unauthorized"));
                 return;
             }
-            Integer uid = (Integer) s.getAttribute("userId");
+            String uid = s.getAttribute("userId").toString();
             try (Connection conn = DatabaseConnection.getConnection(getServletContext());
                     PreparedStatement ps = conn.prepareStatement(
                             "SELECT user_id, role, full_name, email, phone FROM users WHERE user_id = ?")) {
-                ps.setInt(1, uid);
+                ps.setString(1, uid);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
                         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

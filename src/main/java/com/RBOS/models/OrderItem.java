@@ -1,9 +1,9 @@
 package com.RBOS.models;
 
 public class OrderItem {
-    private Integer orderItemId;
-    private Integer orderId;
-    private Integer itemId;
+    private String orderItemId;
+    private String orderId;
+    private String itemId;
     private Integer qty;
     private Double unitPrice;
     private Double lineTotal;
@@ -14,7 +14,7 @@ public class OrderItem {
 
     public OrderItem() {}
 
-    public OrderItem(Integer orderItemId, Integer orderId, Integer itemId, 
+    public OrderItem(String orderItemId, String orderId, String itemId,
                     Integer qty, Double unitPrice, Double lineTotal, String notes) {
         this.orderItemId = orderItemId;
         this.orderId = orderId;
@@ -26,14 +26,14 @@ public class OrderItem {
     }
 
     // Getters and setters
-    public Integer getOrderItemId() { return orderItemId; }
-    public void setOrderItemId(Integer orderItemId) { this.orderItemId = orderItemId; }
+    public String getOrderItemId() { return orderItemId; }
+    public void setOrderItemId(String orderItemId) { this.orderItemId = orderItemId; }
 
-    public Integer getOrderId() { return orderId; }
-    public void setOrderId(Integer orderId) { this.orderId = orderId; }
+    public String getOrderId() { return orderId; }
+    public void setOrderId(String orderId) { this.orderId = orderId; }
 
-    public Integer getItemId() { return itemId; }
-    public void setItemId(Integer itemId) { this.itemId = itemId; }
+    public String getItemId() { return itemId; }
+    public void setItemId(String itemId) { this.itemId = itemId; }
 
     public Integer getQty() { return qty; }
     public void setQty(Integer qty) { this.qty = qty; }

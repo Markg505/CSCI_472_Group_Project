@@ -12,10 +12,7 @@ public class MainServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         try {
-            try (var conn = DatabaseConnection.getConnection(getServletContext())) {
-                // connection established; seed copy (if missing) already handled inside
-                // DatabaseConnection
-            }
+            var conn = DatabaseConnection.getConnection(getServletContext());
             System.out.println("Application initialized successfully");
         } catch (Exception e) {
             throw new ServletException("Failed to initialize application", e);

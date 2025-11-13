@@ -6,42 +6,58 @@ interface WebSocketMessage {
   timestamp: number;
 }
 
-export const useWebSocket = (url: string) => {
+export const useWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const ws = useRef<WebSocket | null>(null);
+  const reconnectTimeout = useRef<number | null>(null);
 
-  const connect = useCallback(() => {
+  const getWebSocketUrl = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    return `${protocol}//${host}/RBOS/realtime`;
+  };
+
+   const connect = useCallback(() => {
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}${import.meta.env.BASE_URL || ''}realtime`;
+      if (reconnectTimeout.current) {
+        window.clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
+
+      const wsUrl = getWebSocketUrl();
+      console.log('WebSocket Connection Attempt:');
+      console.log('URL:', wsUrl);
+      console.log('Mode:', import.meta.env.MODE);
+      console.log('VITE_WS_BASE:', import.meta.env.VITE_WS_BASE);
       
       ws.current = new WebSocket(wsUrl);
       
       ws.current.onopen = () => {
         setIsConnected(true);
-        console.log('WebSocket connected');
+        console.log('WebSocket connected to:', wsUrl);
       };
       
-      ws.current.onclose = () => {
+      ws.current.onclose = (event) => {
         setIsConnected(false);
-        console.log('WebSocket disconnected');
+        console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason || 'Unknown reason');
         
-        // Simple reconnect without storing timeout
-        setTimeout(() => {
+        reconnectTimeout.current = window.setTimeout(() => {
+          console.log('Reconnecting WebSocket...');
           connect();
         }, 3000);
       };
       
       ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('WebSocket connection failed for URL:', wsUrl);
+        console.error('Error details:', error);
       };
       
       ws.current.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           setLastMessage(message);
+          console.log('WebSocket message:', message);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -49,18 +65,24 @@ export const useWebSocket = (url: string) => {
     } catch (error) {
       console.error('WebSocket connection failed:', error);
     }
-  }, [url]);
+  }, []);
 
   const sendMessage = useCallback((message: any) => {
-    if (ws.current && isConnected) {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message));
+      return true;
     }
-  }, [isConnected]);
+    console.warn('WebSocket not connected, cannot send message');
+    return false;
+  }, []);
 
   useEffect(() => {
     connect();
     
     return () => {
+      if (reconnectTimeout.current) {
+        window.clearTimeout(reconnectTimeout.current);
+      }
       if (ws.current) {
         ws.current.close();
       }

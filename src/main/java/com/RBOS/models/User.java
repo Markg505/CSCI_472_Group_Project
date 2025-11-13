@@ -3,7 +3,7 @@ package com.RBOS.models;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class User {
-    private Integer userId;
+    private String userId;
     private String role; // customer, staff, admin
     private String fullName;
     private String email;
@@ -17,7 +17,7 @@ public class User {
     public User() {
     }
 
-    public User(Integer userId, String role, String fullName, String email, String phone) {
+    public User(String userId, String role, String fullName, String email, String phone) {
         this.userId = userId;
         this.role = role;
         this.fullName = fullName;
@@ -25,7 +25,7 @@ public class User {
         this.phone = phone;
     }
 
-    public User(Integer userId, String role, String fullName, String email, String phone, String passwordHash) {
+    public User(String userId, String role, String fullName, String email, String phone, String passwordHash) {
         this.userId = userId;
         this.role = role;
         this.fullName = fullName;
@@ -34,11 +34,11 @@ public class User {
         this.passwordHash = passwordHash;
     }
 
-    public Integer getUserId() {
+    public String getUserId() {
         return userId;
     }
 
-    public void setUserId(Integer userId) {
+    public void setUserId(String userId) {
         this.userId = userId;
     }
 

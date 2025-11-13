@@ -5,8 +5,8 @@ export const AUTH_DEBUG_TAG = "RBOS_AUTH_v1";
 
 
 export type User = {
-  userId?: number;
-  id?: number;
+  userId?: string;
+  id?: string;
   email: string;
   role: string;
   name?: string;

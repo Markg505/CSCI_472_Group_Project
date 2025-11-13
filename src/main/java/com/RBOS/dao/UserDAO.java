@@ -24,7 +24,7 @@ public class UserDAO {
 
             while (rs.next()) {
                 User u = new User(
-                        rs.getInt("user_id"),
+                        rs.getString("user_id"),
                         rs.getString("role"),
                         rs.getString("full_name"),
                         rs.getString("email"),
@@ -36,18 +36,18 @@ public class UserDAO {
         return users;
     }
 
-    public User getUserById(int userId) throws SQLException {
+    public User getUserById(String userId) throws SQLException {
         String sql = "SELECT user_id, role, full_name, email, phone, password_hash FROM users WHERE user_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setInt(1, userId);
+            pstmt.setString(1, userId);
             ResultSet rs = pstmt.executeQuery();
 
             if (rs.next()) {
                 User u = new User(
-                        rs.getInt("user_id"),
+                        rs.getString("user_id"),
                         rs.getString("role"),
                         rs.getString("full_name"),
                         rs.getString("email"),
@@ -70,7 +70,7 @@ public class UserDAO {
 
             if (rs.next()) {
                 User u = new User(
-                        rs.getInt("user_id"),
+                        rs.getString("user_id"),
                         rs.getString("role"),
                         rs.getString("full_name"),
                         rs.getString("email"),
@@ -82,7 +82,7 @@ public class UserDAO {
         return null;
     }
 
-    public Integer createUser(User user) throws SQLException {
+    public String createUser(User user) throws SQLException {
         String sql = "INSERT INTO users (role, full_name, email, phone, password_hash) VALUES (?, ?, ?, ?, ?)";
 
         String hash = user.getPasswordHash();
@@ -108,7 +108,7 @@ public class UserDAO {
             if (affectedRows > 0) {
                 try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
                     if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
+                        return generatedKeys.getString(1);
                     }
                 }
             }
@@ -126,24 +126,24 @@ public class UserDAO {
             pstmt.setString(2, user.getFullName());
             pstmt.setString(3, user.getEmail());
             pstmt.setString(4, user.getPhone());
-            pstmt.setInt(5, user.getUserId());
+            pstmt.setString(5, user.getUserId());
 
             return pstmt.executeUpdate() > 0;
         }
     }
 
-    public boolean deleteUser(int userId) throws SQLException {
+    public boolean deleteUser(String userId) throws SQLException {
         String sql = "DELETE FROM users WHERE user_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setInt(1, userId);
+            pstmt.setString(1, userId);
             return pstmt.executeUpdate() > 0;
         }
     }
 
-    public boolean setPassword(int userId, String rawPassword) throws SQLException {
+    public boolean setPassword(String userId, String rawPassword) throws SQLException {
         String hash = (rawPassword == null || rawPassword.isBlank()) ? null : hashPassword(rawPassword);
         String sql = "UPDATE users SET password_hash = ? WHERE user_id = ?";
 
@@ -155,7 +155,7 @@ public class UserDAO {
             } else {
                 pstmt.setString(1, hash);
             }
-            pstmt.setInt(2, userId);
+            pstmt.setString(2, userId);
             return pstmt.executeUpdate() > 0;
         }
     }

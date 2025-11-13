@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const { lastMessage } = useWebSocket('/RBOS/realtime');
+  const { lastMessage } = useWebSocket();
 
   useEffect(() => {
     loadDashboardData();

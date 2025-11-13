@@ -2,7 +2,7 @@ const BASE = (import.meta as any)?.env?.BASE_URL || '/';
 const API_BASE = `${BASE}api`;
 
 export interface User {
-  userId: number;
+  userId: string;
   role: 'customer' | 'staff' | 'admin';
   fullName: string;
   email: string;
@@ -10,15 +10,15 @@ export interface User {
 }
 
 export interface DiningTable {
-  tableId: number;
+  tableId: string;
   name: string;
   capacity: number;
 }
 
 export interface Reservation {
-  reservationId?: number;
-  userId?: number;
-  tableId: number;
+  reservationId?: string;
+  userId?: string;
+  tableId: string;
   startUtc: string;
   endUtc: string;
   partySize: number;
@@ -28,15 +28,56 @@ export interface Reservation {
 }
 
 export interface MenuItem {
-  itemId: number;
+  itemId: string;
   name: string;
+  description: string;
+  category: string;
   price: number;
   active: boolean;
+  imageUrl: string;
+  dietaryTags: string;
+}
+
+export interface MenuItemWithInventory extends MenuItem {
+  inventory?: {
+    qtyOnHand: number;
+    parLevel: number;
+    reorderPoint: number;
+    available: number;
+  };
+}
+
+export interface Inventory {
+  inventoryId?: string;
+  itemId: string;
+  name: string;
+  sku: string;
+  category: string;
+  unit: 'each' | 'lb' | 'oz' | 'case' | 'bag';
+  packSize: number;
+  qtyOnHand: number;
+  parLevel: number;
+  reorderPoint: number;
+  cost: number;
+  location: string;
+  active: boolean;
+  vendor: string;
+  leadTimeDays: number;
+  preferredOrderQty: number;
+  wasteQty: number;
+  lastCountedAt: string;
+  countFreq: 'daily' | 'weekly' | 'monthly';
+  lot: string;
+  expiryDate: string;
+  allergen: 'none' | 'gluten' | 'dairy' | 'eggs' | 'soy' | 'peanuts' | 'tree-nuts' | 'shellfish' | 'fish' | 'sesame';
+  conversion: string;
+  createdUtc?: string;
+  menuItem?: MenuItem;
 }
 
 export interface Order {
-  orderId?: number;
-  userId?: number;
+  orderId?: string;
+  userId?: string;
   source: 'web' | 'phone' | 'walkin';
   status: 'cart' | 'placed' | 'paid' | 'cancelled';
   subtotal: number;
@@ -47,9 +88,9 @@ export interface Order {
 }
 
 export interface OrderItem {
-  orderItemId?: number;
-  orderId?: number;
-  itemId: number;
+  orderItemId?: string;
+  orderId?: string;
+  itemId: string;
   qty: number;
   unitPrice: number;
   lineTotal: number;
@@ -93,7 +134,7 @@ export interface CustomerAnalytics {
 
 export interface MenuPerformance {
   topItems: Array<{
-    itemId: number;
+    itemId: string;
     name: string;
     revenue: number;
     quantity: number;
@@ -138,7 +179,7 @@ class ApiClient {
     });
   }
 
-  async deleteUser(userId: number): Promise<void> {
+  async deleteUser(userId: string): Promise<void> {
     await this.request(`/users/${userId}`, { method: 'DELETE' });
   }
 
@@ -173,22 +214,25 @@ class ApiClient {
       body: JSON.stringify(reservation),
     });
   }
-async deleteReservation(reservationId: number): Promise<void> {
+async deleteReservation(reservationId: string): Promise<void> {
   await this.request(`/reservations/${reservationId}`, { method: 'DELETE' });
 }
 
-async getReservationsForUser(userId: number) {
-
+async getReservationsForUser(userId: string) {
   const all = await this.getReservations();
   return (all || []).filter(r => r.userId === userId);
 }
-  async updateReservationStatus(reservationId: number, status: string): Promise<Reservation> {
-    return this.request(`/reservations/${reservationId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    });
+
+async updateReservationStatus(reservationId: string, status: string): Promise<Reservation> {
+  return this.request(`/reservations/${reservationId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
   }
 
+  async getMenuWithInventory(): Promise<MenuItemWithInventory[]> {
+    return this.request('/menu/with-inventory');
+  }
 
   async getMenuItems(): Promise<MenuItem[]> {
     return this.request('/menu');
@@ -198,7 +242,7 @@ async getReservationsForUser(userId: number) {
     return this.request('/menu/active');
   }
 
-  async createMenuItem(menuItem: Omit<MenuItem, 'itemId'>): Promise<MenuItem> {
+  async createMenuItem(menuItem: Omit<MenuItem, 'id'>): Promise<MenuItem> {
     return this.request('/menu', { method: 'POST', body: JSON.stringify(menuItem) });
   }
 
@@ -206,8 +250,53 @@ async getReservationsForUser(userId: number) {
     return this.request(`/menu/${menuItem.itemId}`, { method: 'PUT', body: JSON.stringify(menuItem) });
   }
 
-  async deleteMenuItem(itemId: number): Promise<void> {
+  async deleteMenuItem(itemId: string): Promise<void> {
     await this.request(`/menu/${itemId}`, { method: 'DELETE' });
+  }
+
+  async updateMenuItemImage(itemId: string, imageUrl: string): Promise<MenuItem> {
+    return this.request(`/menu/${itemId}/image`, {
+        method: 'PUT',
+        body: JSON.stringify({ imageUrl }),
+    });
+  }
+
+  async getMenuItemById(itemId: string): Promise<MenuItem> {
+      return this.request(`/menu/${itemId}`);
+  }
+
+  async getOrderById(orderId: string): Promise<Order> {
+      return this.request(`/orders/${orderId}`);
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+      return this.request('/orders');
+  }
+
+ async getInventory(): Promise<Inventory[]> {
+    return this.request('/inventory');
+  }
+
+  async getLowStockItems(): Promise<Inventory[]> {
+    return this.request('/inventory/low-stock');
+  }
+
+  async createInventory(inventory: Omit<Inventory, 'inventoryId'>): Promise<Inventory> {
+    return this.request('/inventory', {
+      method: 'POST',
+      body: JSON.stringify(inventory),
+    });
+  }
+
+  async updateInventory(inventory: Inventory): Promise<Inventory> {
+    return this.request(`/inventory/${inventory.inventoryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(inventory),
+    });
+  }
+
+  async deleteInventory(inventoryId: string): Promise<void> {
+    await this.request(`/inventory/${inventoryId}`, { method: 'DELETE' });
   }
 
   async createOrder(order: Order): Promise<Order> {
@@ -218,11 +307,11 @@ async getReservationsForUser(userId: number) {
     return this.request(`/orders/status/${status}`);
   }
 
-  async getOrdersByUser(userId: number): Promise<Order[]> {
+  async getOrdersByUser(userId: string): Promise<Order[]> {
     return this.request(`/orders/user/${userId}`);
   }
 
-  async updateOrderStatus(orderId: number, status: string): Promise<Order> {
+  async updateOrderStatus(orderId: string, status: string): Promise<Order> {
     return this.request(`/orders/${orderId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
@@ -233,7 +322,7 @@ async getReservationsForUser(userId: number) {
     return this.request(`/orders/${order.orderId}`, { method: 'PUT', body: JSON.stringify(order) });
   }
 
-  async deleteOrder(orderId: number): Promise<void> {
+  async deleteOrder(orderId: string): Promise<void> {
     await this.request(`/orders/${orderId}`, { method: 'DELETE' });
   }
 

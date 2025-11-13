@@ -15,8 +15,21 @@ export default defineConfig({
     }
   },
   server: {
+    host: '0.0.0.0',
+    port: 5173,
+    cors: true,
     proxy: {
-      '/api': 'http://localhost:8080'
+      '/api': {
+        target: 'http://MSI:8080',
+        changeOrigin: true,
+        secure: false
+      },
+      '/RBOS/realtime': {
+        target: 'ws://MSI:8080',
+        ws: true,
+        changeOrigin: true,
+        secure: false
+      }
     }
   }
 })

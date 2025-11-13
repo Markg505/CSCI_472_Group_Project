@@ -4,7 +4,7 @@ import { useAuth } from '../features/auth/useAuth';
 
 export default function ReservationsPage() {
   const { user } = useAuth();
-  const uid: number = (user as any)?.userId ?? (user as any)?.id ?? 0;
+  const uid = (user as any)?.userId ?? (user as any)?.id ?? '';
 
   const [submitting, setSubmitting] = useState(false);
   const [availableTables, setAvailableTables] = useState<DiningTable[]>([]);
@@ -13,7 +13,7 @@ export default function ReservationsPage() {
   const [editing, setEditing] = useState<Record<number, Reservation>>({});
   const [form, setForm] = useState({
     userId: uid,
-    tableId: 0 as number | '',
+    tableId: '',
     startUtc: '',
     endUtc: '',
     partySize: '2',
@@ -68,7 +68,7 @@ export default function ReservationsPage() {
     try {
       const reservationData: Reservation = {
         userId: uid,
-        tableId: Number(form.tableId),
+        tableId: form.tableId,
         startUtc: form.startUtc,
         endUtc: form.endUtc,
         partySize: parseInt(form.partySize),
@@ -81,7 +81,7 @@ export default function ReservationsPage() {
       
       setForm({
         userId: uid,
-        tableId: 0,
+        tableId: '0',
         startUtc: '',
         endUtc: '',
         partySize: '2',
@@ -114,11 +114,11 @@ export default function ReservationsPage() {
     setEditing(prev => ({ ...prev, [r.reservationId!]: { ...r } }));
   };
 
-  const changeEdit = (id: number, patch: Partial<Reservation>) => {
+  const changeEdit = (id: string, patch: Partial<Reservation>) => {
     setEditing(prev => ({ ...prev, [id]: { ...(prev[id] || {} as Reservation), ...patch } }));
   };
 
-  const saveEdit = async (id: number) => {
+  const saveEdit = async (id: string) => {
     const draft = editing[id];
     if (!draft) return;
     try {
@@ -133,11 +133,11 @@ export default function ReservationsPage() {
     }
   };
 
-  const cancelEdit = (id: number) => {
+  const cancelEdit = (id: string) => {
     setEditing(prev => { const c = { ...prev }; delete c[id]; return c; });
   };
 
-  const cancelReservation = async (id: number) => {
+  const cancelReservation = async (id: string) => {
     try {
       await apiClient.updateReservationStatus(id, 'cancelled');
       const all = await apiClient.getReservations();

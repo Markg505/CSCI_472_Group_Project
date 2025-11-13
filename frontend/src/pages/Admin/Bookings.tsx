@@ -27,7 +27,7 @@ export default function Bookings() {
     return reservations.filter(r => (r.startUtc ?? '').startsWith(today) && r.status !== 'cancelled').length;
   }, [reservations]);
 
-  async function handleStatusUpdate(reservationId: number, newStatus: string) {
+  async function handleStatusUpdate(reservationId: string, newStatus: string) {
     try {
       await apiClient.updateReservationStatus(reservationId, newStatus);
       await loadReservations();
@@ -130,7 +130,7 @@ export default function Bookings() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {reservations.map(r => (
-                <tr key={r.reservationId ?? Math.random()} className="text-sm">
+                <tr key={r.reservationId ?? ''} className="text-sm">
                   <td className="px-3 py-2">{r.reservationId ?? '—'}</td>
                   <td className="px-3 py-2">Guest {r.userId ?? 'N/A'}</td>
                   <td className="px-3 py-2">Table {r.tableId}</td>
@@ -152,7 +152,7 @@ export default function Bookings() {
                   <td className="px-3 py-2">
                     <select
                       value={r.status ?? 'pending'}
-                      onChange={(e) => handleStatusUpdate((r.reservationId ?? 0), e.target.value)}
+                      onChange={(e) => handleStatusUpdate((r.reservationId ?? ''), e.target.value)}
                       className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
                     >
                       {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
