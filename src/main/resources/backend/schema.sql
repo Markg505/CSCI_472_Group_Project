@@ -34,8 +34,8 @@ CREATE TABLE dining_tables (
 -- reservations
 CREATE TABLE reservations (
   reservation_id TEXT PRIMARY KEY,
-  user_id        INTEGER,
-  table_id       INTEGER NOT NULL,
+  user_id        TEXT,
+  table_id       TEXT NOT NULL,
   start_utc      TEXT NOT NULL,
   end_utc        TEXT NOT NULL,
   party_size     INTEGER NOT NULL CHECK (party_size > 0),
