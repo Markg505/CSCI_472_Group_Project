@@ -15,11 +15,6 @@ import java.sql.*;
 @WebServlet("/api/auth/*")
 public class AuthServlet extends HttpServlet {
     private ObjectMapper mapper;
-    private static final boolean BYPASS_AUTH = true; // Temporary bypass flag
-    private static final String MOCK_USER_ID = "mock-user-001";
-    private static final String MOCK_ROLE = "admin";
-    private static final String MOCK_NAME = "Mock User";
-    private static final String MOCK_EMAIL = "mock@example.com";
 
     @Override
     public void init() throws ServletException {
@@ -31,20 +26,7 @@ public class AuthServlet extends HttpServlet {
         String path = path(req);
         if ("/me".equals(path)) {
             resp.setContentType("application/json");
-            
-            if (BYPASS_AUTH) {
-                // Always return mock user when bypass is enabled
-                SafeUser mockUser = new SafeUser(
-                    MOCK_USER_ID,
-                    MOCK_ROLE,
-                    MOCK_NAME,
-                    MOCK_EMAIL,
-                    null
-                );
-                mapper.writeValue(resp.getWriter(), mockUser);
-                return;
-            }
-            
+
             // Authentication
             HttpSession s = req.getSession(false);
             if (s == null || s.getAttribute("userId") == null) {
@@ -85,22 +67,7 @@ public class AuthServlet extends HttpServlet {
         String path = path(req);
         if ("/login".equals(path)) {
             resp.setContentType("application/json");
-            
-            if (BYPASS_AUTH) {
-                // Auto-login with mock user
-                HttpSession s = req.getSession(true);
-                s.setAttribute("userId", MOCK_USER_ID);
-                SafeUser mockUser = new SafeUser(
-                    MOCK_USER_ID,
-                    MOCK_ROLE,
-                    MOCK_NAME,
-                    MOCK_EMAIL,
-                    null
-                );
-                mapper.writeValue(resp.getWriter(), mockUser);
-                return;
-            }
-            
+
             // Normal login
             LoginBody body;
             try {
@@ -133,7 +100,7 @@ public class AuthServlet extends HttpServlet {
                         return;
                     }
                     HttpSession s = req.getSession(true);
-                    s.setAttribute("userId", rs.getInt("user_id"));
+                    s.setAttribute("userId", rs.getString("user_id"));
                     SafeUser u = new SafeUser(
                             rs.getString("user_id"),
                             rs.getString("role"),
@@ -150,26 +117,9 @@ public class AuthServlet extends HttpServlet {
         }
         if ("/register".equals(path)) {
             resp.setContentType("application/json");
-            
-            if (BYPASS_AUTH) {
-                // Auto-login with mock user for registration
-                HttpSession s = req.getSession(true);
-                s.setAttribute("userId", MOCK_USER_ID);
-                SafeUser mockUser = new SafeUser(
-                    MOCK_USER_ID,
-                    MOCK_ROLE,
-                    MOCK_NAME,
-                    MOCK_EMAIL,
-                    null
-                );
-                resp.setStatus(HttpServletResponse.SC_CREATED);
-                mapper.writeValue(resp.getWriter(), mockUser);
-                return;
-            }
-            
+
             // Normal registration
             try {
-
                 JsonNode root = mapper.readTree(req.getReader());
 
                 String fullName = null;
@@ -242,11 +192,8 @@ public class AuthServlet extends HttpServlet {
                     mapper.writeValue(resp.getWriter(), new Msg("error"));
                 }
             } catch (Exception e) {
-
                 e.printStackTrace();
-
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-
                 String msg = e.getMessage() != null ? e.getMessage() : "invalid";
                 mapper.writeValue(resp.getWriter(), new Msg(msg));
             }
@@ -271,7 +218,19 @@ public class AuthServlet extends HttpServlet {
     }
 
     private boolean checkPassword(String raw, String stored) {
-        return stored != null && stored.equals(raw);
+        if (stored == null)
+            return false;
+        // try BCrypt if available
+        try {
+            Class<?> bc = Class.forName("org.mindrot.jbcrypt.BCrypt");
+            var checkpw = bc.getMethod("checkpw", String.class, String.class);
+            Object ok = checkpw.invoke(null, raw, stored);
+            if (ok instanceof Boolean && (Boolean) ok)
+                return true;
+        } catch (Throwable ignored) {
+            // no bcrypt or it failed — fall back to plain compare
+        }
+        return stored.equals(raw);
     }
 
     public static class LoginBody {

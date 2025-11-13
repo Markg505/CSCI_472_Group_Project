@@ -7,12 +7,14 @@
     <property name="webcontent.dir" value="${src.dir}/main/webapp"/>
     <property name="webinf.dir" value="${webcontent.dir}/WEB-INF"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
-    <property name="lib.dir" value="${webinf.dir}/lib"/>
+    
+    <property name="lib.dir" value="${basedir}/lib"/>
     <property name="war.file" value="${dist.dir}/${ant.project.name}.war"/>
 
     <property name="java17.home" value="../../Program Files/Java/jdk-17"/>
 
-    <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+    
+    <property name="glassfish.home" value="C:/glassfish7"/>
     <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
     <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
     <property name="jakarta.activation.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.activation-api.jar"/>
