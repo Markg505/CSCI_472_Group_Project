@@ -15,6 +15,11 @@ import java.sql.*;
 @WebServlet("/api/auth/*")
 public class AuthServlet extends HttpServlet {
     private ObjectMapper mapper;
+    private static final boolean BYPASS_AUTH = true; // Temporary bypass flag
+    private static final String MOCK_USER_ID = "mock-user-001";
+    private static final String MOCK_ROLE = "admin";
+    private static final String MOCK_NAME = "Mock User";
+    private static final String MOCK_EMAIL = "mock@example.com";
 
     @Override
     public void init() throws ServletException {
@@ -26,6 +31,21 @@ public class AuthServlet extends HttpServlet {
         String path = path(req);
         if ("/me".equals(path)) {
             resp.setContentType("application/json");
+            
+            if (BYPASS_AUTH) {
+                // Always return mock user when bypass is enabled
+                SafeUser mockUser = new SafeUser(
+                    MOCK_USER_ID,
+                    MOCK_ROLE,
+                    MOCK_NAME,
+                    MOCK_EMAIL,
+                    null
+                );
+                mapper.writeValue(resp.getWriter(), mockUser);
+                return;
+            }
+            
+            // Authentication
             HttpSession s = req.getSession(false);
             if (s == null || s.getAttribute("userId") == null) {
                 resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -44,7 +64,7 @@ public class AuthServlet extends HttpServlet {
                         return;
                     }
                     SafeUser u = new SafeUser(
-                            rs.getInt("user_id"),
+                            rs.getString("user_id"),
                             rs.getString("role"),
                             rs.getString("full_name"),
                             rs.getString("email"),
@@ -65,6 +85,23 @@ public class AuthServlet extends HttpServlet {
         String path = path(req);
         if ("/login".equals(path)) {
             resp.setContentType("application/json");
+            
+            if (BYPASS_AUTH) {
+                // Auto-login with mock user
+                HttpSession s = req.getSession(true);
+                s.setAttribute("userId", MOCK_USER_ID);
+                SafeUser mockUser = new SafeUser(
+                    MOCK_USER_ID,
+                    MOCK_ROLE,
+                    MOCK_NAME,
+                    MOCK_EMAIL,
+                    null
+                );
+                mapper.writeValue(resp.getWriter(), mockUser);
+                return;
+            }
+            
+            // Normal login
             LoginBody body;
             try {
                 body = mapper.readValue(req.getReader(), LoginBody.class);
@@ -98,7 +135,7 @@ public class AuthServlet extends HttpServlet {
                     HttpSession s = req.getSession(true);
                     s.setAttribute("userId", rs.getInt("user_id"));
                     SafeUser u = new SafeUser(
-                            rs.getInt("user_id"),
+                            rs.getString("user_id"),
                             rs.getString("role"),
                             rs.getString("full_name"),
                             rs.getString("email"),
@@ -113,6 +150,24 @@ public class AuthServlet extends HttpServlet {
         }
         if ("/register".equals(path)) {
             resp.setContentType("application/json");
+            
+            if (BYPASS_AUTH) {
+                // Auto-login with mock user for registration
+                HttpSession s = req.getSession(true);
+                s.setAttribute("userId", MOCK_USER_ID);
+                SafeUser mockUser = new SafeUser(
+                    MOCK_USER_ID,
+                    MOCK_ROLE,
+                    MOCK_NAME,
+                    MOCK_EMAIL,
+                    null
+                );
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                mapper.writeValue(resp.getWriter(), mockUser);
+                return;
+            }
+            
+            // Normal registration
             try {
 
                 JsonNode root = mapper.readTree(req.getReader());
@@ -156,7 +211,7 @@ public class AuthServlet extends HttpServlet {
                     user.setRole(role);
 
                 UserDAO dao = new UserDAO(getServletContext());
-                Integer userId = dao.createUser(user);
+                String userId = dao.createUser(user);
 
                 if (userId != null) {
                     user.setUserId(userId);
@@ -216,7 +271,6 @@ public class AuthServlet extends HttpServlet {
     }
 
     private boolean checkPassword(String raw, String stored) {
-
         return stored != null && stored.equals(raw);
     }
 
@@ -234,13 +288,13 @@ public class AuthServlet extends HttpServlet {
     }
 
     public static class SafeUser {
-        public Integer userId;
+        public String userId;
         public String role;
         public String fullName;
         public String email;
         public String phone;
 
-        public SafeUser(Integer userId, String role, String fullName, String email, String phone) {
+        public SafeUser(String userId, String role, String fullName, String email, String phone) {
             this.userId = userId;
             this.role = role;
             this.fullName = fullName;

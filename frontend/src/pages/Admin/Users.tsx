@@ -89,7 +89,7 @@ export default function Users() {
     if (!confirm("Delete this user? This action cannot be undone.")) return;
     const id = safeId(u);
     try {
-      await apiClient.deleteUser(Number(id));
+      await apiClient.deleteUser(String(id));
       await load();
     } catch (err: any) {
       console.error("delete failed", err);
@@ -121,7 +121,7 @@ export default function Users() {
     e.preventDefault();
     if (!isAdmin) return alert("Only admins can edit users.");
     if (!editUser) return;
-    const id = Number(safeId(editUser));
+    const id = (safeId(editUser));
     if (!id) return alert("Missing user id");
 
     try {
