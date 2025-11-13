@@ -15,8 +15,7 @@ export const useWebSocket = (url: string) => {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      // const wsUrl = `ws://localhost:8080/RBOS/realtime`
-      const wsUrl = `${protocol}//${host}${url}`;
+      const wsUrl = `${protocol}//${host}${import.meta.env.BASE_URL || ''}realtime`;
       
       ws.current = new WebSocket(wsUrl);
       

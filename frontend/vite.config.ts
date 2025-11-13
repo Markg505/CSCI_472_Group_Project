@@ -13,5 +13,10 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash][extname]'
       }
     }
+  },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080'
+    }
   }
 })

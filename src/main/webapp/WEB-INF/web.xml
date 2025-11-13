@@ -10,4 +10,14 @@
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>
 
+    <servlet>
+        <servlet-name>WebSocketEndpoint</servlet-name>
+        <servlet-class>com.RBOS.websocket.WebSocketConfig</servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+        <servlet-name>WebSocketEndpoint</servlet-name>
+        <url-pattern>/realtime</url-pattern>
+    </servlet-mapping>
+
 </web-app>
