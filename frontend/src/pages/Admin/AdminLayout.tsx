@@ -13,6 +13,7 @@ const nav = [
   { name: "Dashboard", to: "/admin" },
   { name: "Users", to: "/admin/users" },
   { name: "Bookings", to: "/admin/bookings" },
+  { name: "Orders", to: "/admin/orders" },
   { name: "Menu", to: "/admin/menu" },
   { name: "Tables", to: "/admin/tables" },
   { name: "Inventory", to: "/admin/inventory" },

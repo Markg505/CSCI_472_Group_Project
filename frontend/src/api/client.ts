@@ -170,6 +170,14 @@ export interface MenuPerformance {
   totalMenuItems: number;
   activeMenuItems: number;
 }
+export interface BookingSettings {
+  openTime: string;                 
+  closeTime: string;                
+  daysOpen: { [k: string]: boolean }; 
+  maxDaysOut: number;               
+  reservationLengthMinutes: number; 
+  slotIntervalMinutes?: number;     
+}
 
 class ApiClient {
   private baseURL = API_BASE;
@@ -313,6 +321,16 @@ async updateReservationStatus(reservationId: string, status: string): Promise<Re
   async getOrderById(orderId: string): Promise<Order> {
       return this.request(`/orders/${orderId}`);
   }
+  async getBookingSettings(): Promise<BookingSettings> {
+  return this.request('/booking-settings');
+}
+
+async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings> {
+  return this.request('/booking-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
 
   async getAllOrders(): Promise<Order[]> {
       return this.request('/orders');
