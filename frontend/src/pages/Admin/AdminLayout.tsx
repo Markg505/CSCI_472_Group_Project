@@ -1,18 +1,13 @@
+// src/.../AdminShell.tsx
 import {
   Disclosure, DisclosureButton, DisclosurePanel,
-  Menu, MenuButton, MenuItem, MenuItems,
 } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import "./admin.css";
 import NotificationBell from '../../components/NotificationBell';
-
-const user = {
-  name: "Tom Cook",
-  email: "tom@example.com",
-  imageUrl:
-    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-};
+import UserMenu from '../../components/UserMenu';
+import { useAuth } from "../../features/auth/useAuth";
 
 const nav = [
   { name: "Dashboard", to: "/admin" },
@@ -29,6 +24,23 @@ function cx(...cls: Array<string | false | null | undefined>) {
 }
 
 export default function AdminShell() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // display name fallback
+  const displayName = (user?.fullName ?? (user as any)?.fullName ?? user?.email) || "Admin";
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate("/");
+    }
+  };
+
+  // simple avatar fallback 
+  const imageUrl = (user && (user as any).imageUrl) || "https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500";
+
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Top dark nav */}
@@ -68,38 +80,8 @@ export default function AdminShell() {
               <div className="ml-4 flex items-center md:ml-6">
                 <NotificationBell />
 
-                <Menu as="div" className="relative ml-3">
-                  <MenuButton className="relative flex max-w-xs items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
-                    <span className="absolute -inset-1.5" />
-                    <span className="sr-only">Open user menu</span>
-                    <img
-                      alt=""
-                      src={user.imageUrl}
-                      className="size-8 rounded-full outline -outline-offset-1 outline-white/10"
-                    />
-                  </MenuButton>
-                  <MenuItems
-                    transition
-                    className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5 transition
-                               data-[closed]:scale-95 data-[closed]:opacity-0 data-[closed]:transform
-                               data-[enter]:duration-100 data-[enter]:ease-out data-[leave]:duration-75 data-[leave]:ease-in"
-                  >
-                    {[
-                      { name: "Your profile", to: "#" },
-                      { name: "Settings", to: "/admin/settings" },
-                      { name: "Sign out", to: "/" },
-                    ].map((i) => (
-                      <MenuItem key={i.name}>
-                        <a
-                          href={i.to}
-                          className="block px-4 py-2 text-sm text-gray-700 data-[focus]:bg-gray-100 data-[focus]:outline-hidden"
-                        >
-                          {i.name}
-                        </a>
-                      </MenuItem>
-                    ))}
-                  </MenuItems>
-                </Menu>
+                
+                <UserMenu adminPath="/admin" />
               </div>
             </div>
 
@@ -136,16 +118,33 @@ export default function AdminShell() {
                 {item.name}
               </DisclosureButton>
             ))}
+
+            <div className="border-t border-white/5 mt-2 pt-2">
+              <DisclosureButton as={NavLink} to="/admin/profile" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
+                Your profile
+              </DisclosureButton>
+              <DisclosureButton as={NavLink} to="/admin/settings" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
+                Settings
+              </DisclosureButton>
+              <DisclosureButton as={Link} to="/" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
+                Return to site
+              </DisclosureButton>
+              <DisclosureButton
+                as="button"
+                onClick={() => { handleSignOut(); }}
+                className="block w-full text-left px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md"
+              >
+                Sign out
+              </DisclosureButton>
+            </div>
           </div>
         </DisclosurePanel>
       </Disclosure>
 
-      
-
       {/* Page content container */}
       <main className="bg-slate-950">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {/* Example big patterned panel like the screenshot */}
+          
           <div className="admin-panel rounded-2xl p-6">
             <Outlet />
           </div>

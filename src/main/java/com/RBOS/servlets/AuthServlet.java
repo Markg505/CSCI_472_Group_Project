@@ -2,6 +2,9 @@ package com.RBOS.servlets;
 
 import com.RBOS.utils.DatabaseConnection;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.RBOS.dao.UserDAO;
+import com.RBOS.models.User;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -108,6 +111,92 @@ public class AuthServlet extends HttpServlet {
             }
             return;
         }
+        if ("/register".equals(path)) {
+            resp.setContentType("application/json");
+            try {
+
+                JsonNode root = mapper.readTree(req.getReader());
+
+                String fullName = null;
+                if (root.hasNonNull("full_name"))
+                    fullName = root.get("full_name").asText();
+                else if (root.hasNonNull("fullName"))
+                    fullName = root.get("fullName").asText();
+
+                // required fields
+                String email = root.hasNonNull("email") ? root.get("email").asText() : null;
+                String password = root.hasNonNull("password") ? root.get("password").asText() : null;
+
+                String phone = null;
+                if (root.has("phone")) {
+                    String p = root.get("phone").asText("");
+                    phone = p.trim().isEmpty() ? null : p.trim();
+                }
+
+                String role = null;
+                if (root.hasNonNull("role"))
+                    role = root.get("role").asText();
+
+                // Basic validation
+                if (fullName == null || fullName.isBlank()
+                        || email == null || email.isBlank()
+                        || password == null || password.isBlank()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    mapper.writeValue(resp.getWriter(), new Msg("invalid"));
+                    return;
+                }
+
+                // Build User object manually
+                User user = new User();
+                user.setFullName(fullName);
+                user.setEmail(email.trim());
+                user.setPassword(password);
+                user.setPhone(phone);
+                if (role != null && !role.isBlank())
+                    user.setRole(role);
+
+                UserDAO dao = new UserDAO(getServletContext());
+                Integer userId = dao.createUser(user);
+
+                if (userId != null) {
+                    user.setUserId(userId);
+                    // create session and mark user as logged in
+                    HttpSession s = req.getSession(true);
+                    s.setAttribute("userId", userId);
+
+                    // Build the SafeUser to return
+                    SafeUser su = new SafeUser(
+                            userId,
+                            user.getRole() != null ? user.getRole() : "customer",
+                            user.getFullName(),
+                            user.getEmail(),
+                            user.getPhone() // may be null
+                    );
+
+                    resp.setStatus(HttpServletResponse.SC_CREATED);
+                    mapper.writeValue(resp.getWriter(), su);
+                } else {
+                    resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to create user");
+                }
+            } catch (SQLException e) {
+                // SQLite constraint
+                if (e.getErrorCode() == 19) {
+                    resp.sendError(HttpServletResponse.SC_CONFLICT, "Email already exists");
+                } else {
+                    resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    mapper.writeValue(resp.getWriter(), new Msg("error"));
+                }
+            } catch (Exception e) {
+
+                e.printStackTrace();
+
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+                String msg = e.getMessage() != null ? e.getMessage() : "invalid";
+                mapper.writeValue(resp.getWriter(), new Msg(msg));
+            }
+            return;
+        }
 
         if ("/logout".equals(path)) {
             resp.setContentType("application/json");
@@ -127,7 +216,7 @@ public class AuthServlet extends HttpServlet {
     }
 
     private boolean checkPassword(String raw, String stored) {
-        // For simplicity, we use plain text comparison here.
+
         return stored != null && stored.equals(raw);
     }
 

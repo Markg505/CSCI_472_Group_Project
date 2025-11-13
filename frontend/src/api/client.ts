@@ -1,6 +1,9 @@
 const BASE = (import.meta as any)?.env?.BASE_URL || '/';
 const API_BASE = `${BASE}api`;
 
+const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
+
+
 export interface User {
   userId: string;
   role: 'customer' | 'staff' | 'admin';
@@ -96,7 +99,30 @@ export interface OrderItem {
   lineTotal: number;
   notes?: string;
 }
-
+export interface InventoryItem  {
+  id: string;
+  name: string;
+  sku: string;                 
+  category: string;
+  unit: string;                  
+  packSize: number;            
+  qtyOnHand: number;
+  parLevel: number;            
+  reorderPoint: number;        
+  cost: number;               
+  location: string;           
+  active: boolean;
+  vendor: string;              
+  leadTimeDays: number;
+  preferredOrderQty: number;
+  wasteQty: number;            
+  lastCountedAt: string;      
+  countFreq: string;        
+  lot: string;                 
+  expiryDate: string;          
+  allergen: string;          
+  conversion: string;          
+};
 export interface ReportMetrics {
   todayReservations: number;
   pendingReservations: number;
@@ -167,7 +193,15 @@ class ApiClient {
     if (ct.includes('application/json')) return response.json();
     return null;
   }
-
+async listUsers(): Promise<User[]> {
+  return this.request('/users') as Promise<User[]>;
+}
+async createUser(payload: Partial<User> & { password?: string }): Promise<User> {
+  return this.request('/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }) as Promise<User>;
+}
   async getUserByEmail(email: string): Promise<User> {
     return this.request(`/users/email/${encodeURIComponent(email)}`);
   }
@@ -186,6 +220,9 @@ class ApiClient {
   async getTables(): Promise<DiningTable[]> {
     return this.request('/tables');
   }
+    async getsInventory(): Promise<InventoryItem[]> {
+    return this.request('/inventory');
+  }
 
   async getAvailableTables(startUtc: string, endUtc: string, partySize: number): Promise<DiningTable[]> {
     const params = new URLSearchParams({ startUtc, endUtc, partySize: partySize.toString() });
@@ -203,7 +240,15 @@ class ApiClient {
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
   }
-
+  async listInventory(): Promise<InventoryItem[]> {
+    return this.request('/inventory');
+  }
+   async  addInventoryItem(item: InventoryItem): Promise<InventoryItem> {
+    return this.request('/inventory', { method: 'POST', body: JSON.stringify(item) });
+  }
+async updateInventoryItem(id: string,patch: Partial<InventoryItem>): Promise<InventoryItem> {
+    return this.request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+}
   async createReservation(reservation: Reservation): Promise<Reservation> {
     return this.request('/reservations', { method: 'POST', body: JSON.stringify(reservation) });
   }
