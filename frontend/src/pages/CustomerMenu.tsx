@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useCart } from "../features/cart/CartContext";
+import { useNotifications } from "../features/notifications/NotificationContext";
 import { apiClient, type MenuItemWithInventory } from "../api/client";
 
 type Dietary = "veg" | "vegan" | "gf" | "spicy";
@@ -58,6 +59,7 @@ function parseDietaryTags(dietaryTags: string): Dietary[] {
 
 export default function MenuPage() {
   const { dispatch } = useCart();
+  const { addNotification } = useNotifications();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("All");
   const [diet, setDiet] = useState<Set<Dietary>>(new Set());
@@ -91,6 +93,13 @@ export default function MenuPage() {
         imageUrl: menuItem.imageUrl,
         dietaryTags: menuItem.dietaryTags
       }
+    });
+    
+    // Show success notification
+    addNotification({
+      type: 'success',
+      title: 'Added to cart',
+      message: `${menuItem.name} has been added to your order`
     });
   };
 
