@@ -1,5 +1,5 @@
 // src/features/auth/useAuth.ts
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 
 export const AUTH_DEBUG_TAG = "RBOS_AUTH_v1";
 
@@ -33,17 +33,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
 
-  const saveMe = (me: User | null) => {
+  const saveMe = useCallback((me: User | null) => {
     if (me) {
-      try { storage.setItem("rbos_user", JSON.stringify(me)); } catch {}
+      try { storage.setItem("rbos_user", JSON.stringify(me)); } catch {
+        // Ignore storage errors (e.g., quota exceeded)
+      }
     } else {
       storage.removeItem("rbos_user");
     }
     setUser(me);
-  };
+  }, []);
 
 
-  const fetchMe = async (): Promise<User | null> => {
+  const fetchMe = useCallback(async (): Promise<User | null> => {
     try {
       const r = await fetch("/RBOS/api/auth/me", { credentials: "include" });
       if (r.ok) {
@@ -51,21 +53,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveMe(me);
         return me;
       }
-    } catch {}
+    } catch {
+      // Ignore fetch errors - user is not authenticated
+    }
 
     saveMe(null);
     return null;
-  };
+  }, [saveMe]);
 
 
   useEffect(() => {
 
     const raw = storage.getItem("rbos_user");
-    if (raw) { try { setUser(JSON.parse(raw)); } catch {} }
+    if (raw) { try { setUser(JSON.parse(raw)); } catch { /* Ignore parse errors */ } }
 
 
     (async () => { await fetchMe(); })();
-  }, []);
+  }, [fetchMe]);
 
   const loginWithCredentials = async (email: string, password: string) => {
     const res = await fetch("/RBOS/api/auth/login", {
@@ -76,7 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       let msg = "Login failed";
-      try { const j = await res.json(); if (j?.message) msg = j.message; } catch {}
+      try { const j = await res.json(); if (j?.message) msg = j.message; } catch {
+        // Ignore JSON parse errors - use default message
+      }
       throw new Error(msg);
     }
     const me = await fetchMe();
@@ -98,14 +104,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       let msg = "Registration failed";
-      try { const j = await res.json(); if (j?.message) msg = j.message; } catch {}
+      try { const j = await res.json(); if (j?.message) msg = j.message; } catch { /* Ignore JSON parse errors */ }
       throw new Error(msg);
     }
     await fetchMe();
   };
 
   const logout = async () => {
-    try { await fetch("/RBOS/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
+    try { await fetch("/RBOS/api/auth/logout", { method: "POST", credentials: "include" }); } catch {
+      // Ignore logout errors - proceed with local cleanup
+    }
     saveMe(null);
   };
 

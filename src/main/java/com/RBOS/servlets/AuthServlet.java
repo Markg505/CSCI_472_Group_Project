@@ -15,7 +15,7 @@ import java.sql.*;
 @WebServlet("/api/auth/*")
 public class AuthServlet extends HttpServlet {
     private ObjectMapper mapper;
-    private static final boolean BYPASS_AUTH = true; // Temporary bypass flag
+    private static final boolean BYPASS_AUTH = false; // Set to false for production authentication
     private static final String MOCK_USER_ID = "mock-user-001";
     private static final String MOCK_ROLE = "admin";
     private static final String MOCK_NAME = "Mock User";
@@ -120,18 +120,25 @@ public class AuthServlet extends HttpServlet {
                     PreparedStatement ps = conn.prepareStatement(
                             "SELECT user_id, role, full_name, email, phone, password_hash FROM users WHERE email = ?")) {
                 ps.setString(1, body.email.trim());
+                System.out.println("Login attempt for email: " + body.email);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
+                        System.out.println("User not found: " + body.email);
                         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         mapper.writeValue(resp.getWriter(), new Msg("invalid_credentials"));
                         return;
                     }
                     String hash = rs.getString("password_hash");
+                    System.out.println("Found user: " + rs.getString("email") + " role: " + rs.getString("role"));
+                    System.out.println("Password hash: " + hash);
+                    System.out.println("Password provided: " + body.password);
                     if (!checkPassword(body.password, hash)) {
+                        System.out.println("Password check failed");
                         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         mapper.writeValue(resp.getWriter(), new Msg("invalid_credentials"));
                         return;
                     }
+                    System.out.println("Password check passed, creating session");
                     HttpSession s = req.getSession(true);
                     s.setAttribute("userId", rs.getInt("user_id"));
                     SafeUser u = new SafeUser(
@@ -140,6 +147,7 @@ public class AuthServlet extends HttpServlet {
                             rs.getString("full_name"),
                             rs.getString("email"),
                             rs.getString("phone"));
+                    System.out.println("Login successful for user: " + u.email);
                     mapper.writeValue(resp.getWriter(), u);
                 }
             } catch (SQLException e) {

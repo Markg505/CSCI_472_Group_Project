@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth , AUTH_DEBUG_TAG } from "../features/auth/useAuth";
+import { useCart } from "../features/cart/CartContext";
 import { useState } from "react";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import UserMenu from "../components/UserMenu"; 
@@ -34,6 +35,7 @@ function AvatarCircle() {
 
 export default function NavBar() {
   const { user, logout } = useAuth();
+  const { state: cartState } = useCart();
   console.log("NavBar tag   =", AUTH_DEBUG_TAG);
   console.log("NavBar user =", user);
   const [open, setOpen] = useState(false);
@@ -70,6 +72,32 @@ export default function NavBar() {
 
         
         <div className="hidden md:flex items-center gap-3">
+          {/* Cart Icon */}
+          <Link 
+            to="/cart" 
+            className="relative p-2 rounded-xl hover:bg-white/5 transition"
+            aria-label="Shopping cart"
+          >
+            <svg 
+              className="w-6 h-6" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
+              />
+            </svg>
+            {cartState.items.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-gold text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {cartState.items.length}
+              </span>
+            )}
+          </Link>
+          
           <UserMenu />
         </div>
 

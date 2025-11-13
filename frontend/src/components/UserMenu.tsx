@@ -29,7 +29,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ adminPath = "/admin" }) => {
   const role = String(user?.role ?? "").toLowerCase();
   const isAdminOrStaff = isSignedIn && (role === "admin" || role === "staff");
 
-  const displayName = user?.fullName ?? (user as any)?.fullName ?? user?.email ?? "Account";
+  const displayName = user?.fullName ?? user?.email ?? "Account";
 
   const handleSignOut = async () => {
     try {
@@ -63,24 +63,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ adminPath = "/admin" }) => {
       >
         <MenuItem>
           {({ active }) => (
-            <Link to="/account" className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}>
-              Your profile
-            </Link>
-          )}
-        </MenuItem>
-
-        <MenuItem>
-          {({ active }) => (
-            <Link to="/settings" className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}>
-              Settings
-            </Link>
-          )}
-        </MenuItem>
-
-        <MenuItem>
-          {({ active }) => (
-            <Link to="/" className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}>
-              Return to site
+            <Link to="/dashboard" className={`block px-4 py-2 text-sm text-gray-900 ${active ? "bg-gray-100" : ""}`}>
+              Dashboard
             </Link>
           )}
         </MenuItem>
@@ -88,8 +72,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ adminPath = "/admin" }) => {
         {isAdminOrStaff && (
           <MenuItem>
             {({ active }) => (
-              <Link to={adminPath} className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}>
-                Admin
+              <Link to={adminPath} className={`block px-4 py-2 text-sm text-gray-900 ${active ? "bg-gray-100" : ""}`}>
+                Admin Panel
               </Link>
             )}
           </MenuItem>
@@ -101,7 +85,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ adminPath = "/admin" }) => {
           {({ active }) => (
             <button
               onClick={handleSignOut}
-              className={`w-full text-left block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}
+              className={`w-full text-left block px-4 py-2 text-sm text-gray-900 ${active ? "bg-gray-100" : ""}`}
             >
               Sign out
             </button>
