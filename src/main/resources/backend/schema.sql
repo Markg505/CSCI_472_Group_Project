@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS reservations;
 DROP TABLE IF EXISTS dining_tables;
 DROP TABLE IF EXISTS menu_items;
 DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS inventory;
+
 COMMIT;
 
 PRAGMA foreign_keys = ON;
@@ -71,34 +71,6 @@ CREATE TABLE orders (
 
 CREATE INDEX idx_orders_by_user ON orders(user_id, created_utc);
 
---inventory
-CREATE TABLE inventory (
-  inventory_id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL,
-  sku TEXT UNIQUE,                 
-  category TEXT,
-  unit TEXT NOT NULL CHECK (unit IN ('each', 'lb','oz','case','bag')),                 
-  packSize INTEGER,           
-  qtyOnHand INTEGER,
-  parLevel INTEGER,            
-  reorderPoint INTEGER,        
-  cost REAL NOT NULL CHECK (cost >= 0),             
-  location TEXT,           
-  active BOOLEAN DEFAULT 1,
-  vendor TEXT,              
-  leadTimeDays INTEGER,
-  preferredOrderQty INTEGER,
-  wasteQty INTEGER,            
-  lastCountedAt INTEGER,     
-  countFreq INTEGER,        
-  lot TEXT,                 
-  expiryDate TEXT,         
-  allergen TEXT NOT NULL CHECK (allergen IN ('none', 'gluten', 'dairy', 'eggs', 'soy', 'peanuts', 'tree-nuts', 'shellfish', 'fish', 'sesame')),          
-  conversion TEXT          
-); 
-
-CREATE INDEX idx_inventory_name ON inventory(name);
-
 -- order items
 CREATE TABLE order_items (
   order_item_id INTEGER PRIMARY KEY,
@@ -127,11 +99,6 @@ INSERT INTO users (user_id, role, full_name, email, phone, password_hash) VALUES
   (6, 'customer', 'Casey Lee',       'casey@example.com',  '555-2003', NULL),
   (7, 'customer', 'Morgan Diaz',     'morgan@example.com', '555-2004', NULL),
   (8, 'customer', 'Jamie Fox',       'jamie@example.com',  '555-2005', NULL);
-
-  INSERT INTO inventory (inventory_id, name, sku, category, unit, packSize, qtyOnHand, parLevel, reorderPoinT, cost, location, active, vendor, leadTimeDays, preferredOrderQty, wasteQty, lastCountedAt, countFreq, lot, expiryDate, allergen, conversion) VALUES
-  (1, 'Tomatoes', 'SKU001', 'Produce', 'lb', 10, 50, 20, 15, 1.50, 'Refrigerator', 1, 'Fresh Farms', 2, 20, 0, 20240401, 7, 'LOT123', '2024-06-01', 'none', '1 lb = 16 oz'),
-  (2, 'Mozzarella Cheese', 'SKU002', 'Dairy', 'lb', 5, 30, 10, 8, 3.00, 'Refrigerator', 1, 'Dairy Best', 3, 10, 0, 20240401, 14, 'LOT456', '2024-05-15', 'dairy', '1 lb = 16 oz'),
-  (3, 'Basil Leaves', 'SKU003', 'Herbs', 'oz', 16, 100, 40, 30, 0.75, 'Refrigerator', 1, 'Herb World', 1, 50, 0, 20240401, 7, 'LOT789', '2024-04-30', 'none', '1 oz = 28.35 g');
 
 -- DINING TABLES (10)
 INSERT INTO dining_tables (table_id, name, capacity) VALUES

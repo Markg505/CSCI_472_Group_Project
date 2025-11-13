@@ -1,8 +1,9 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth , AUTH_DEBUG_TAG } from "../features/auth/useAuth";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import UserMenu from "../components/UserMenu"; 
+
+
 
 const LinkStyle = ({ to, label }: { to: string; label: string }) => (
   <NavLink
@@ -17,7 +18,9 @@ const LinkStyle = ({ to, label }: { to: string; label: string }) => (
 
 function AvatarCircle() {
   return (
+    
     <div className="size-8 rounded-full bg-white/10 grid place-items-center">
+      {/* simple person icon */}
       <svg
         viewBox="0 0 24 24"
         aria-hidden="true"
@@ -50,10 +53,6 @@ export default function NavBar() {
     }
   };
 
-  const isSignedIn = Boolean(user && (user.userId ?? user.id ?? user.email)); 
-  const normalizedRole = String(user?.role ?? "").toLowerCase();
-  const isAdminOrStaff = isSignedIn && (normalizedRole === "admin" || normalizedRole === "staff");
-
   return (
     <header className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-bg/70 border-b border-white/10">
       <div className="container-xl h-16 flex items-center justify-between">
@@ -65,12 +64,74 @@ export default function NavBar() {
           <LinkStyle to="/" label="Home" />
           <LinkStyle to="/menu" label="Menu" />
           <LinkStyle to="/reservations" label="Reservations" />
-          {isAdminOrStaff && <LinkStyle to="/admin" label="Admin" />}
+          {user?.role !== "CUSTOMER" && <LinkStyle to="/admin" label="Admin" />}
         </nav>
 
-        
+        {/* Right side (desktop) */}
         <div className="hidden md:flex items-center gap-3">
-          <UserMenu />
+          {user ? (
+            <Menu as="div" className="relative">
+            <MenuButton className="relative flex items-center gap-2 rounded-full px-2 py-1 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
+              <span className="sr-only">Open user menu</span>
+              <AvatarCircle />
+              <span className="text-sm text-slate-300 max-w-40 truncate">Hi, {user.name}</span>
+            </MenuButton>
+              <MenuItems
+                transition
+                className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5
+                           data-[closed]:scale-95 data-[closed]:opacity-0 data-[closed]:transform
+                           data-[enter]:duration-100 data-[enter]:ease-out data-[leave]:duration-75 data-[leave]:ease-in z-50"
+              >
+                <MenuItem>
+                  {({ active }) => (
+                    <Link
+                      to="/account"
+                      className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}
+                    >
+                      Your profile
+                    </Link>
+                  )}
+                </MenuItem>
+                <MenuItem>
+                  {({ active }) => (
+                    <Link
+                      to="/settings"
+                      className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}
+                    >
+                      Settings
+                    </Link>
+                  )}
+                </MenuItem>
+                {user?.role !== "CUSTOMER" && (
+                  <MenuItem>
+                    {({ active }) => (
+                      <Link
+                        to="/admin"
+                        className={`block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}
+                      >
+                        Admin
+                      </Link>
+                    )}
+                  </MenuItem>
+                )}
+                <div className="my-1 border-t border-gray-100" />
+                <MenuItem>
+                  {({ active }) => (
+                    <button
+                      onClick={handleLogout}
+                      className={`w-full text-left block px-4 py-2 text-sm ${active ? "bg-gray-100" : ""}`}
+                    >
+                      Sign out
+                    </button>
+                  )}
+                </MenuItem>
+              </MenuItems>
+            </Menu>
+          ) : (
+            <Link to="/login" className="btn-primary">
+              Sign in
+            </Link>
+          )}
         </div>
 
         {/* Mobile */}
@@ -97,7 +158,7 @@ export default function NavBar() {
             <Link to="/reservations" onClick={() => setOpen(false)}>
               Reservations
             </Link>
-            {isAdminOrStaff && (
+            {user?.role !== "CUSTOMER" && (
               <Link to="/admin" onClick={() => setOpen(false)}>
                 Admin
               </Link>

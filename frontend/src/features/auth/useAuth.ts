@@ -4,21 +4,22 @@ import React, { createContext, useContext, useEffect, useState, type ReactNode }
 export const AUTH_DEBUG_TAG = "RBOS_AUTH_v1";
 
 
-export type SafeUser = {
+export type User = {
   userId?: number;
-  
+  id?: number;
   email: string;
   role: string;
-  
+  name?: string;
   fullName?: string;
-  phone?: string;
+  full_name?: string;
+  avatarUrl?: string;
 };
 
 export type AuthContextType = {
-  user: any | null;
-  setUser: (u: any | null) => void;
+  user: User | null;
+  setUser: (u: User | null) => void;
   loginWithCredentials: (email: string, password: string) => Promise<void>;
-  signup: (data: { full_name?: string; email: string; phone?: string; password: string }) => Promise<void>;
+  signup: (data: { full_name?: string; name?: string; email: string; phone?: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -29,10 +30,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const storage = sessionStorage;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
 
-  const saveMe = (me: any| null) => {
+  const saveMe = (me: User | null) => {
     if (me) {
       try { storage.setItem("rbos_user", JSON.stringify(me)); } catch {}
     } else {
@@ -42,11 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
 
-  const fetchMe = async (): Promise<any | null> => {
+  const fetchMe = async (): Promise<User | null> => {
     try {
       const r = await fetch("/RBOS/api/auth/me", { credentials: "include" });
       if (r.ok) {
-        const me = (await r.json()) as any;
+        const me = (await r.json()) as User;
         saveMe(me);
         return me;
       }

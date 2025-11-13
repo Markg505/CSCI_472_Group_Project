@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../features/auth/useAuth";
 
 type FormData = {
-  fullName: string;
+  full_name: string;
   email: string;
   phone?: string;
   password: string;
@@ -15,7 +15,6 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
-    getValues,  
     formState: { errors, isSubmitting },
   } = useForm<FormData>();
   const { signup } = useAuth(); 
@@ -23,46 +22,22 @@ export default function RegisterPage() {
 
   const pwd = watch("password");
 
-const onSubmit = async (v: FormData) => {
-  
-  console.log("DEBUG onSubmit - v:", v);
-
-  
-  const fromV_snake = (v as any)['full_name'];
-  const fromV_camel = (v as any).fullName;
-  const fromGet_snake = (getValues as any) ? (getValues as any)('full_name') : undefined;
-  const fromGet_camel = (getValues as any) ? (getValues as any)('fullName') : undefined;
-
-  
-  const dom_snake = (document.querySelector('input[name="full_name"]') as HTMLInputElement | null)?.value;
-  const dom_camel = (document.querySelector('input[name="fullName"]') as HTMLInputElement | null)?.value;
-
-  const rawName = fromV_snake ?? fromV_camel ?? fromGet_snake ?? fromGet_camel ?? dom_snake ?? dom_camel ?? "";
-  const fullName = String(rawName).trim();
-
-  console.log("DEBUG DOM value for name (snake):", dom_snake, " (camel):", dom_camel);
-  console.log("DEBUG resolved fullName:", fullName);
-
- 
-  const payload = {
-    full_name: fullName, 
-    email: v.email?.trim().toLowerCase(),
-    password: v.password,
-    ...(v.phone?.trim() ? { phone: v.phone.trim() } : {}),
+  const onSubmit = async (v: FormData) => {
+    try {
+      await signup({
+        full_name: v.full_name.trim(),
+        email: v.email.trim().toLowerCase(),
+        phone: v.phone?.trim() || "",
+        password: v.password,
+      } as any); 
+      navigate("/");
+    } catch (e: any) {
+     
+      let msg = "Registration failed";
+      if (e?.message) msg = e.message;
+      alert(msg);
+    }
   };
-
-  console.log("DEBUG payload:", payload);
-
-  try {
-    await signup(payload as any);
-    alert("Account created — a confirmation email has been sent to your address.");
-    navigate("/");
-  } catch (err: any) {
-    console.error("Registration error:", err);
-    alert(err?.message ?? "Registration failed");
-  }
-};
-
 
   return (
     <section className="container-xl py-16">
@@ -74,15 +49,15 @@ const onSubmit = async (v: FormData) => {
             <label className="block text-sm text-mute mb-1">Full name</label>
             <input
               type="text"
-              {...register("fullName", {
+              {...register("full_name", {
                 required: "Name is required",
                 minLength: { value: 2, message: "Too short" },
               })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
               placeholder="Jane Doe"
             />
-            {errors.fullName && (
-              <p className="mt-1 text-xs text-red-400">{errors.fullName.message}</p>
+            {errors.full_name && (
+              <p className="mt-1 text-xs text-red-400">{errors.full_name.message}</p>
             )}
           </div>
 
