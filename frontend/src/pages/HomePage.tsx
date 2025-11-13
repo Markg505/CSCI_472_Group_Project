@@ -1,3 +1,6 @@
+import React from "react";
+import { Link } from "react-router-dom";
+
 export default function HomePage() {
   return (
     <>
@@ -13,11 +16,11 @@ export default function HomePage() {
           <div className="max-w-2xl">
             <h1 className="h1">Restaurant <span className="text-gold">GEM</span></h1>
             <p className="mt-6 text-lg md:text-xl text-mute">
-              Seasonal tasting menus crafted with precision. Reserve your table and let us take care of the rest.
+              Seasonal tasting menus crafted with precision. Reserve your table and let us take care of the rest
             </p>
             <div className="mt-8 flex gap-3">
-              <a href="/reservations" className="btn-primary">Reserve a table</a>
-              <a href="/menu" className="btn-ghost">View menu</a>
+              <Link to="/reservations" className="btn-primary">Reserve a table</Link>
+              <Link to="/menu" className="btn-ghost">View menu</Link>
             </div>
           </div>
         </div>
@@ -52,7 +55,12 @@ export default function HomePage() {
             "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop",
             "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1200&auto=format&fit=crop",
           ].map((src, i) => (
-            <img key={i} src={src} className="rounded-3xl border border-white/10 object-cover h-52 md:h-64 w-full" />
+            <img
+              key={i}
+              src={src}
+              className="rounded-3xl border border-white/10 object-cover h-52 md:h-64 w-full"
+              alt={`gallery-${i}`}
+            />
           ))}
         </div>
       </section>

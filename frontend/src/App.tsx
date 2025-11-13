@@ -1,18 +1,35 @@
+// src/App.tsx
 import { Outlet } from "react-router-dom";
+import { CartProvider } from "./features/cart/CartContext";
+import { NotificationProvider } from "./features/notifications/NotificationContext";
+import { AuthProvider } from "./features/auth/useAuth";
+import { useWebSocket } from "./hooks/useWebSocket";
 import NavBar from "./components/NavBar";
+import "./index.css";
+
+function WebSocketStatus() {
+  const { isConnected, lastMessage } = useWebSocket();
+
+  console.log('WebSocket connection status:', isConnected);
+  if (lastMessage) {
+    console.log('Last WebSocket message:', lastMessage);
+  }
+
+  return null;
+}
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <NavBar />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <footer className="border-t border-white/10">
-        <div className="container-xl py-10 text-sm text-mute">
-          © {new Date().getFullYear()} RBOS
-        </div>
-      </footer>
-    </div>
+    <AuthProvider>
+      <CartProvider>
+        <NotificationProvider>
+          <WebSocketStatus />
+          <div className="min-h-screen bg-bg text-fg">
+            <NavBar />
+            <Outlet />
+          </div>
+        </NotificationProvider>
+      </CartProvider>
+    </AuthProvider>
   );
 }

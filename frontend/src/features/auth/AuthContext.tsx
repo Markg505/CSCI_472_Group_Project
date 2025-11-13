@@ -2,7 +2,7 @@ import React, { createContext, useEffect, useState } from "react";
 import { getMe, login as loginApi, signup as signupApi } from "./api";
 
 export type Role = "CUSTOMER" | "STAFF" | "ADMIN";
-export type User = { id: number; name: string; role: Role };
+export type User = { id: string; name: string; role: Role };
 
 export type AuthContextValue = {
   user: User | null;

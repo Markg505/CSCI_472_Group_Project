@@ -6,7 +6,7 @@ export type Allergen =
   | "peanuts" | "tree-nuts" | "shellfish" | "fish" | "sesame";
 
 export type UserRow = { id: string; name: string; email: string; role: Role };
-export type MenuItem = { id: string; name: string; price: number; category: string; available: boolean };
+export type MenuItem = { itemId: string; name: string; price: number; category: string; active: boolean, imageUrl: string, dietaryTags: string, description: string};
 export type TableRow = { id: string; number: number; capacity: number; notes?: string };
 export type InventoryItem = {
   id: string;
@@ -40,8 +40,8 @@ let USERS: UserRow[] = [
 ];
 
 let MENU: MenuItem[] = [
-  { id: "m1", name: "Cheeseburger", price: 10.99, category: "Entrees", available: true },
-  { id: "m2", name: "Caesar Salad", price: 8.5,  category: "Salads",  available: true },
+  { itemId: "m1", name: "Cheeseburger", price: 10.99, category: "Entrees", active: true, imageUrl: '', dietaryTags: '', description: '' },
+  { itemId: "m2", name: "Caesar Salad", price: 8.5,  category: "Salads",  active: true, imageUrl: '', dietaryTags: '', description: '' },
 ];
 
 let TABLES: TableRow[] = [
@@ -56,8 +56,8 @@ export async function addUser(u: Omit<UserRow, "id">) { await wait(120); USERS.p
 export async function removeUser(id: string) { await wait(120); USERS = USERS.filter(u => u.id !== id); }
 
 export async function listMenu() { await wait(120); return [...MENU]; }
-export async function addMenuItem(m: Omit<MenuItem, "id">) { await wait(120); MENU.push({ id: String(Date.now()), ...m }); }
-export async function removeMenuItem(id: string) { await wait(120); MENU = MENU.filter(m => m.id !== id); }
+export async function addMenuItem(m: Omit<MenuItem, "itemId">) { await wait(120); MENU.push({ itemId: String(Date.now()), ...m }); }
+export async function removeMenuItem(id: string) { await wait(120); MENU = MENU.filter(m => m.itemId !== id); }
 
 export async function listTables() { await wait(120); return [...TABLES]; }
 export async function addTable(t: Omit<TableRow, "id">) { await wait(120); TABLES.push({ id: String(Date.now()), ...t }); }
@@ -113,7 +113,7 @@ function todayISO(): string {
 function seed(): InventoryItem[] {
   const rows: InventoryItem[] = [
     {
-      id: crypto.randomUUID(),
+      id: "111111",
       name: "Brioche Buns",
       sku: "BN-BRIOCHE-12",
       category: "Bakery",
@@ -138,7 +138,7 @@ function seed(): InventoryItem[] {
       conversion: "1 case = 12 each",
     },
     {
-      id: crypto.randomUUID(),
+      id: "111112",
       name: "Ground Beef 80/20",
       sku: "MEAT-GB80-5LB",
       category: "Meat",
@@ -185,7 +185,7 @@ export async function listInventory(): Promise<InventoryItem[]> {
 }
 
 export async function addInventoryItem(item: NewInventoryItem): Promise<InventoryItem> {
-  const row: InventoryItem = { ...item, id: crypto.randomUUID() };
+  const row: InventoryItem = { ...item, id: crypto.randomUUID().toString() };
   INVENTORY.unshift(row);
   save();
   return structuredClone(row);

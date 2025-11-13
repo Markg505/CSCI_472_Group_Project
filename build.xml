@@ -1,4 +1,4 @@
-<project name="RBOS_Web_Deployment" default="package-war" basedir=".">
+<project name="RBOS" default="package-war" basedir=".">
 
     <property name="src.dir" value="src"/>
     <property name="frontend.dir" value="${basedir}/frontend"/>
@@ -10,16 +10,37 @@
     <property name="lib.dir" value="${webinf.dir}/lib"/>
     <property name="war.file" value="${dist.dir}/${ant.project.name}.war"/>
 
+    <property name="java17.home" value="../../Program Files/Java/jdk-17"/>
+
+    <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+    <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
+    <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
+    <property name="jakarta.activation.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.activation-api.jar"/>
+    <property name="jakarta.websocket.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.websocket-api.jar"/>
+    <property name="jakarta.websocket.client.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.websocket-client-api.jar"/>
+    <property name="websocket.api.osgi.jar" value="${glassfish.home}/glassfish/modules/webservices-api-osgi.jar"/>
+    <property name="websocket.osgi.jar" value="${glassfish.home}/glassfish/modules/webservices-osgi.jar"/>
+
+    <property name="RBOS_DB" value="${user.home}/.rbos/restaurant.db"/>
+    <property name="SEED_DB" value="${basedir}/src/main/resources/backend/restaurant.db"/>
+    <dirname property="RBOS_DIR" file="${RBOS_DB}"/>
+
     <path id="compile.classpath">
         <fileset dir="${lib.dir}">
             <include name="*.jar"/>
         </fileset>
+        <pathelement location="${servlet.api.jar}"/>
+        <pathelement location="${jakarta.mail.api.jar}"/>
+        <pathelement location="${jakarta.activation.api.jar}"/>
+        <pathelement location="${jakarta.websocket.api.jar}"/>
+        <pathelement location="${jakarta.websocket.client.api.jar}"/>
+        <pathelement location="${websocket.api.osgi.jar}"/>
+        <pathelement location="${websocket.osgi.jar}"/>
     </path>
 
     <target name="clean">
         <delete dir="${build.dir}"/>
         <delete dir="${dist.dir}"/>
-        <!-- Clean webapp content except WEB-INF -->
         <delete includeEmptyDirs="true">
             <fileset dir="${webcontent.dir}">
                 <include name="**/*"/>
@@ -47,6 +68,19 @@
         </copy>
     </target>
 
+    <target name="-guard-db">
+        <condition property="db.in.repo">
+            <contains string="${RBOS_DB}" substring="${basedir}"/>
+        </condition>
+        <fail if="db.in.repo" message="RBOS_DB must be outside the repo (e.g., ${user.home}/.rbos/restaurant.db)."/>
+    </target>
+
+    <target name="bootstrap-db">
+        <mkdir dir="${RBOS_DIR}"/>
+        <copy file="${SEED_DB}" tofile="${RBOS_DB}" overwrite="false" verbose="true"/>
+        <echo>Live DB: ${RBOS_DB}</echo>
+    </target>
+
     <target name="init" depends="clean,build-frontend">
         <mkdir dir="${build.dir}"/>
         <mkdir dir="${dist.dir}"/>
@@ -56,35 +90,36 @@
     <target name="compile" depends="init">
         <javac srcdir="${src.dir}/main/java"
                destdir="${classes.dir}"
+               release="17"
                classpathref="compile.classpath"
                debug="true"
+               executable="${java17.home}/bin/javac"
                includeantruntime="false"/>
+        <copy todir="${classes.dir}">
+            <fileset dir="${src.dir}/main/resources" includes="**/*"/>
+        </copy>
+        <echo message="Java classes compiled"/>
     </target>
 
-    <target name="package-war" depends="compile">
+    <target name="package-war" depends="-guard-db, bootstrap-db, compile">
         <war destfile="${war.file}" webxml="${webinf.dir}/web.xml">
-            <fileset dir="${webcontent.dir}"/>
-            <lib dir="${lib.dir}"/>
-            <classes dir="${classes.dir}"/>
-        </war>
-        <echo message="WAR file created at: ${war.file}"/>
-    </target>
-
-    <target name="package-war-no-xml" depends="compile">
-        <war destfile="${war.file}"  needxmlfile="false">
-            <fileset dir="${webcontent.dir}"/>
-            <lib dir="${lib.dir}"/>
-            <classes dir="${classes.dir}"/>
-        </war>
-        <echo message="WAR file created at: ${war.file}"/>
-    </target>
-
-    <target name="test-minimal">
-        <war destfile="${dist.dir}/simple-test.war" needxmlfile="false">
             <fileset dir="${webcontent.dir}">
-                <include name="index.html"/>
+                <include name="**/*"/>
             </fileset>
+            <lib dir="${lib.dir}"/>
+            <classes dir="${classes.dir}"/>
         </war>
+        <echo message="WAR file created at: ${war.file}"/>
+    </target>
+
+    <target name="deploy" depends="package-war">
+        <echo message="Deploying to GlassFish..."/>
+        <exec executable="${glassfish.home}/bin/asadmin.bat">
+            <arg value="deploy"/>
+            <arg value="--force=true"/>
+            <arg value="${war.file}"/>
+        </exec>
+        <echo message="Application deployed successfully"/>
     </target>
 
 </project>
