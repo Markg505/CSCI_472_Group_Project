@@ -86,6 +86,34 @@ CREATE TABLE order_items (
 
 CREATE INDEX idx_order_items_order ON order_items(order_id);
 
+--inventory
+CREATE TABLE inventory (
+  inventory_id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  sku TEXT UNIQUE,                
+  category TEXT,
+  unit TEXT NOT NULL CHECK (unit IN 'each', 'lb','oz','case','bag'),                
+  packSize INTEGER,          
+  qtyOnHand INTEGER,
+  parLevel INTEGER,            
+  reorderPoinT INTEGER,        
+  cost REAL NOT NULL CHECK (unit_price >= 0),            
+  location TEXT,          
+  active BOOLEAN DEFAULT 1,
+  vendor TEXT,              
+  leadTimeDays INTEGER,
+  preferredOrderQty INTEGER,
+  wasteQty INTEGER,            
+  lastCountedAt INTEGER,    
+  countFreq INTEGER,        
+  lot TEXT,                
+  expiryDate TEXT,        
+  allergen TEXT NOT NULL CHECK (allergen IN ('none', 'gluten', 'dairy', 'eggs', 'soy', 'peanuts', 'tree-nuts', 'shellfish', 'fish', 'sesame')),          
+  conversion TEXT          
+);
+ 
+CREATE INDEX idx_inventory_name ON inventory(name);
+
 -- ===== seed data ============================================================
 BEGIN TRANSACTION;
 
@@ -219,4 +247,18 @@ INSERT INTO order_items VALUES
   (15, 8,11, 1,  7.95,  7.95, ''),
   (16, 8,12, 1,  0.00,  0.00, 'free drink coupon');
 
+-- INVENTORY ITEMS
+INSERT INTO inventory VALUES
+  (111111, 'Brioche Buns', 'BN-BRIOCHE-12', 'Bakery'), 
+  ('case', 12, 3, 4, 2, 16.5, 'Dry A3', true),
+  ('Sunrise Bakery', 2, 4, 6, todayISO(), 'weekly'), 
+  ('BB-2409A', '', 'gluten', '1 case = 12 each');
+
+INSERT INTO inventory VALUES
+  (111112, 'Ground Beef 80/20', 'MEAT-GB80-5LB', 'Meat'), 
+  ('lb', 5, 18, 20, 12, 3.2, 'Walk-in', true),
+  ('Acme Meats', 1, 50, 0, todayISO(), 'weekly'), 
+  ('GB-2410', '', '', 'none', '1 bag = 5 lb');
+
+  
 COMMIT;
