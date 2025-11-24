@@ -11,6 +11,7 @@ public class Order {
     private Double tax;
     private Double total;
     private String createdUtc;
+    private String cartToken;
     
     // Optional: Include related objects
     private User user;
@@ -28,6 +29,12 @@ public class Order {
         this.tax = tax;
         this.total = total;
         this.createdUtc = createdUtc;
+    }
+
+    public Order(String orderId, String userId, String cartToken, String source, String status,
+                 Double subtotal, Double tax, Double total, String createdUtc) {
+        this(orderId, userId, source, status, subtotal, tax, total, createdUtc);
+        this.cartToken = cartToken;
     }
 
     // Getters and setters
@@ -54,6 +61,9 @@ public class Order {
 
     public String getCreatedUtc() { return createdUtc; }
     public void setCreatedUtc(String createdUtc) { this.createdUtc = createdUtc; }
+
+    public String getCartToken() { return cartToken; }
+    public void setCartToken(String cartToken) { this.cartToken = cartToken; }
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }

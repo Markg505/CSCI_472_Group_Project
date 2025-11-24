@@ -1,18 +1,11 @@
-
 import { useEffect, useMemo, useState } from "react";
-import {
-  listTables,
-  addTable,
-  removeTable,
-  type TableRow,
-} from "../../lib/adminApi";
-
+import { apiClient, type DiningTable } from "../../api/client";
 import {
   CheckIcon,
   ChevronDownIcon,
   LinkIcon,
   PencilIcon,
-  UserGroupIcon, // for seats
+  UserGroupIcon,
 } from "@heroicons/react/20/solid";
 import {
   Menu as HUMenu,
@@ -22,12 +15,12 @@ import {
 } from "@headlessui/react";
 
 export default function TablesAdmin() {
-  const [rows, setRows] = useState<TableRow[]>([]);
+  const [rows, setRows] = useState<DiningTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
 
-  const [form, setForm] = useState<{ number: string; capacity: string; notes: string }>({
-    number: "",
+  const [form, setForm] = useState<{ name: string; capacity: string; notes: string }>({
+    name: "",
     capacity: "",
     notes: "",
   });
@@ -35,34 +28,49 @@ export default function TablesAdmin() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setRows(await listTables());
+      await refresh();
       setLoading(false);
     })();
   }, []);
+
+  async function refresh() {
+    try {
+      const data = await apiClient.getTables();
+      setRows(data ?? []);
+    } catch (err) {
+      console.error("Failed to load tables", err);
+      setRows([]);
+    }
+  }
 
   const total = rows.length;
   const totalSeats = useMemo(() => rows.reduce((sum, r) => sum + (r.capacity || 0), 0), [rows]);
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
-    const num = parseInt(form.number, 10);
     const cap = parseInt(form.capacity, 10);
-    if (Number.isNaN(num) || Number.isNaN(cap) || cap <= 0) return;
+    if (Number.isNaN(cap) || cap <= 0) return;
 
-    await addTable({ number: num, capacity: cap, notes: form.notes.trim() || undefined });
-    setRows(await listTables());
-    setForm({ number: "", capacity: "", notes: "" });
+    const name = form.name.trim() || `Table ${rows.length + 1}`;
+    await apiClient.createTable({ name, capacity: cap });
+    await refresh();
+    setForm({ name: "", capacity: "", notes: "" });
     setShowAdd(false);
   }
 
-  async function onDelete(id: string) {
-    await removeTable(id);
-    setRows(await listTables());
+  async function onDelete(id?: string) {
+    if (!id) return;
+    try {
+      await apiClient.deleteTable(id);
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+    await refresh();
   }
 
   function exportCSV() {
-    const header = ["Number", "Capacity", "Notes"];
-    const lines = rows.map(r => [r.number, r.capacity, (r.notes ?? "").replaceAll("\n", " ")].join(","));
+    const header = ["Name", "Capacity"];
+    const lines = rows.map(r => [r.name || r.tableId, r.capacity].join(","));
     const csv = [header.join(","), ...lines].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -82,7 +90,6 @@ export default function TablesAdmin() {
 
           <div className="mt-1 flex flex-col sm:mt-0 sm:flex-row sm:flex-wrap sm:space-x-6">
             <div className="mt-2 flex items-center text-sm text-gray-500">
-              {/* total tables */}
               <span className="mr-1.5 inline-block size-2 rounded-full bg-indigo-500" />
               Total: {total}
             </div>
@@ -174,13 +181,13 @@ export default function TablesAdmin() {
         >
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Table #</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Table Name</label>
               <input
-                type="number"
-                className="w-28 rounded-md border border-slate-300 px-3 py-2"
-                value={form.number}
-                onChange={e => setForm(f => ({ ...f, number: e.target.value }))}
-                placeholder="1"
+                type="text"
+                className="w-40 rounded-md border border-slate-300 px-3 py-2"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Main Floor 1"
               />
             </div>
             <div>
@@ -206,7 +213,7 @@ export default function TablesAdmin() {
             <div className="ml-auto flex gap-2">
               <button
                 type="button"
-                onClick={() => { setShowAdd(false); setForm({ number: "", capacity: "", notes: "" }); }}
+                onClick={() => { setShowAdd(false); setForm({ name: "", capacity: "", notes: "" }); }}
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
               >
                 Cancel
@@ -230,22 +237,20 @@ export default function TablesAdmin() {
           <table className="w-full border-collapse">
             <thead className="bg-slate-50">
               <tr className="text-left text-sm text-slate-600">
-                <th className="px-3 py-2">Table #</th>
+                <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Capacity</th>
-                <th className="px-3 py-2">Notes</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {rows.map(t => (
-                <tr key={t.id} className="text-sm">
-                  <td className="px-3 py-2">{t.number}</td>
+                <tr key={t.tableId} className="text-sm">
+                  <td className="px-3 py-2">{t.name || t.tableId}</td>
                   <td className="px-3 py-2">{t.capacity}</td>
-                  <td className="px-3 py-2">{t.notes}</td>
                   <td className="px-3 py-2 text-right">
                     <button
                       className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
-                      onClick={() => onDelete(t.id)}
+                      onClick={() => onDelete(t.tableId)}
                     >
                       Delete
                     </button>
@@ -254,7 +259,7 @@ export default function TablesAdmin() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={3} className="px-3 py-8 text-center text-slate-500">
                     No tables yet.
                   </td>
                 </tr>

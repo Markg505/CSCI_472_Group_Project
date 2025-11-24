@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotifications } from '../features/notifications/NotificationContext';
 import { BellIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -30,6 +31,11 @@ export default function NotificationBell() {
     dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
   };
 
+  const safeAction = (e: React.MouseEvent, fn: () => void) => {
+    e.stopPropagation();
+    fn();
+  };
+
   const formatTime = (timestamp: Date) => {
     const now = new Date();
     const diff = now.getTime() - timestamp.getTime();
@@ -58,15 +64,16 @@ export default function NotificationBell() {
       </button>
 
       {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+      {isOpen && createPortal(
+        <div className="fixed right-4 top-16 w-80 origin-top-right rounded-md bg-white shadow-xl ring-2 ring-black/10 focus:outline-none z-[200000] drop-shadow-2xl"
+             onMouseDown={(e) => e.stopPropagation()}>
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-medium text-gray-900">Notifications</h3>
               <div className="flex gap-2">
                 {state.unreadCount > 0 && (
                   <button
-                    onClick={markAllAsRead}
+                    onClick={(e) => safeAction(e, markAllAsRead)}
                     className="text-sm text-indigo-600 hover:text-indigo-500"
                   >
                     Mark all read
@@ -118,9 +125,9 @@ export default function NotificationBell() {
                               {formatTime(notification.timestamp)}
                             </span>
                             <div className="flex gap-2">
-                              {notification.action && (
+                              {notification.action && notification.action.onClick && (
                                 <button
-                                  onClick={notification.action.onClick}
+                                  onClick={(e) => safeAction(e, () => notification.action?.onClick?.())}
                                   className="text-xs text-indigo-600 hover:text-indigo-500"
                                 >
                                   {notification.action.label}
@@ -128,14 +135,14 @@ export default function NotificationBell() {
                               )}
                               {!notification.read && (
                                 <button
-                                  onClick={() => markAsRead(notification.id)}
+                                  onClick={(e) => safeAction(e, () => markAsRead(notification.id))}
                                   className="text-xs text-gray-400 hover:text-gray-600"
                                 >
                                   <CheckIcon className="h-4 w-4" />
                                 </button>
                               )}
                               <button
-                                onClick={() => removeNotification(notification.id)}
+                                onClick={(e) => safeAction(e, () => removeNotification(notification.id))}
                                 className="text-xs text-gray-400 hover:text-gray-600"
                               >
                                 <XMarkIcon className="h-4 w-4" />
@@ -150,7 +157,8 @@ export default function NotificationBell() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

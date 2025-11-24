@@ -76,7 +76,17 @@ export default function CartPage() {
     <section className="container-xl py-16">
       <div className="max-w-4xl mx-auto">
         <h1 className="h2">Your Order</h1>
-        
+
+        {state.banners.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {state.banners.map(msg => (
+              <div key={msg} className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                {msg}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mt-8 space-y-4">
           {state.items.map(item => (
             <div key={item.itemId} className="flex items-center justify-between p-4 border border-white/10 rounded-xl">

@@ -10,6 +10,7 @@ public class Reservation {
     private String status; // 'pending', 'confirmed', 'cancelled', 'no_show'
     private String notes;
     private String createdUtc;
+    private String guestName;
 
     // Optional: Include related objects for convenience
     private User user;
@@ -58,6 +59,9 @@ public class Reservation {
 
     public String getCreatedUtc() { return createdUtc; }
     public void setCreatedUtc(String createdUtc) { this.createdUtc = createdUtc; }
+
+    public String getGuestName() { return guestName; }
+    public void setGuestName(String guestName) { this.guestName = guestName; }
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }

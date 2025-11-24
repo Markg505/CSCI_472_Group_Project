@@ -1,14 +1,22 @@
 package com.RBOS.utils;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.DatabaseMetaData;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import jakarta.servlet.ServletContext;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 public class DatabaseConnection {
 
@@ -35,9 +43,74 @@ public class DatabaseConnection {
         return s == null || s.trim().isEmpty();
     }
 
+    private static List<String> parseStatements(InputStream schemaStream) throws Exception {
+        List<String> statements = new ArrayList<>();
+        StringBuilder cleaned = new StringBuilder();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(schemaStream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("--")) {
+                    continue;
+                }
+
+                int inlineComment = line.indexOf("--");
+                if (inlineComment >= 0) {
+                    line = line.substring(0, inlineComment);
+                }
+
+                cleaned.append(line).append('\n');
+            }
+        }
+
+        for (String raw : cleaned.toString().split(";")) {
+            String stmt = raw.trim();
+            if (!stmt.isEmpty()) {
+                statements.add(stmt);
+            }
+        }
+
+        return statements;
+    }
+
+    private static boolean seedFromSchema(Path target) {
+        try (InputStream schemaStream = DatabaseConnection.class
+                .getClassLoader()
+                .getResourceAsStream("backend/schema.sql")) {
+            if (schemaStream == null) {
+                return false;
+            }
+
+            Class.forName("org.sqlite.JDBC");
+            List<String> statements = parseStatements(schemaStream);
+
+            if (statements.isEmpty()) {
+                System.out.println("[DB] Failed to seed from schema.sql: no statements parsed");
+                return false;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + target.toString());
+                    Statement stmt = conn.createStatement()) {
+                for (String sql : statements) {
+                    stmt.execute(sql);
+                }
+            }
+
+            System.out.println("[DB] Seeded from schema.sql at: " + target);
+            return true;
+        } catch (Exception e) {
+            System.out.println("[DB] Failed to seed from schema.sql: " + e.getMessage());
+            return false;
+        }
+    }
+
     private static void seedIfMissing(String absolutePath) {
         Path target = Paths.get(absolutePath);
         if (Files.exists(target))
+            return;
+
+        if (seedFromSchema(target))
             return;
 
         try (InputStream in = DatabaseConnection.class
@@ -58,6 +131,7 @@ public class DatabaseConnection {
     public static String getDatabasePath(ServletContext context) {
         String external = resolveDatabasePath(context);
         seedIfMissing(external);
+        ensureSchema(external);
         return external;
     }
 
@@ -78,6 +152,94 @@ public class DatabaseConnection {
             return conn;
         } catch (ClassNotFoundException e) {
             throw new SQLException("SQLite JDBC driver not found", e);
+        }
+    }
+
+    private static void ensureSchema(String dbPath) {
+        Path target = Paths.get(dbPath);
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            System.out.println("[DB] SQLite driver unavailable; skipping schema verification: " + e.getMessage());
+            return;
+        }
+
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + target.toString())) {
+            boolean migrated = false;
+
+            if (!columnExists(conn, "orders", "cart_token")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE orders ADD COLUMN cart_token TEXT UNIQUE");
+                    stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_by_cart_token ON orders(cart_token)");
+                    migrated = true;
+                    System.out.println("[DB] Added missing orders.cart_token column");
+                }
+            }
+
+            if (!columnExists(conn, "orders", "created_utc")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE orders ADD COLUMN created_utc TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))");
+                    migrated = true;
+                    System.out.println("[DB] Added missing orders.created_utc column");
+                }
+            }
+
+            if (!columnExists(conn, "menu_items", "image_url")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE menu_items ADD COLUMN image_url TEXT");
+                    stmt.execute("ALTER TABLE menu_items ADD COLUMN dietary_tags TEXT");
+                    stmt.execute("ALTER TABLE menu_items ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
+                    migrated = true;
+                    System.out.println("[DB] Added missing menu_items presentation columns");
+                }
+            }
+
+            if (!columnExists(conn, "reservations", "guest_name")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE reservations ADD COLUMN guest_name TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing reservations.guest_name column");
+                }
+            }
+
+            if (!migrated) {
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("[DB] Schema verification failed (" + e.getMessage() + "). Rebuilding from schema.sql");
+            backupAndRebuild(target);
+        }
+    }
+
+    private static boolean columnExists(Connection conn, String table, String column) {
+        try {
+            DatabaseMetaData meta = conn.getMetaData();
+            try (var rs = meta.getColumns(null, null, table, column)) {
+                return rs.next();
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void backupAndRebuild(Path target) {
+        try {
+            if (Files.exists(target)) {
+                Path backup = target.resolveSibling(target.getFileName().toString() + ".bak-" + System.currentTimeMillis());
+                Files.copy(target, backup);
+                Files.delete(target);
+                System.out.println("[DB] Existing DB backed up to: " + backup);
+            }
+        } catch (Exception ex) {
+            System.out.println("[DB] Failed to backup existing DB: " + ex.getMessage());
+        }
+
+        if (!seedFromSchema(target)) {
+            System.out.println("[DB] Rebuild failed; the database will be created empty.");
+            try {
+                Files.createFile(target);
+            } catch (Exception ignored) {
+            }
         }
     }
 }

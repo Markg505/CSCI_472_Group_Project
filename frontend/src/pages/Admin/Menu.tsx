@@ -19,6 +19,8 @@ type MenuItemType = {
   category: string;
   imageUrl: string;
   dietaryTags: string;
+  inventorySku?: string;
+  inventoryId?: string;
 };
 
 interface EditModalProps {
@@ -29,12 +31,14 @@ interface EditModalProps {
 
 function EditModal({ item, onClose, onUpdate }: EditModalProps) {
   const [form, setForm] = useState({
+    itemId: item.itemId,
     name: item.name,
     price: item.price.toString(),
     active: item.active,
     description: item.description,
     category: item.category,
-    dietaryTags: item.dietaryTags
+    dietaryTags: item.dietaryTags,
+    inventorySku: item.inventoryId ?? item.inventorySku ?? ''
   });
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
   const [loading, setLoading] = useState(false);
@@ -44,23 +48,26 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
     setLoading(true);
     
     try {
-      const updatedItem: MenuItemType = {
-        ...item,
-        name: form.name,
-        price: parseFloat(form.price),
-        active: form.active,
-        description: form.description,
-        category: form.category,
-        dietaryTags: form.dietaryTags,
-        imageUrl: imageUrl
-      };
+        const updatedItem: MenuItemType = {
+          itemId: form.itemId,
+          name: form.name,
+          price: parseFloat(form.price),
+          active: form.active,
+          description: form.description,
+          category: form.category,
+          dietaryTags: form.dietaryTags,
+          imageUrl: imageUrl,
+          inventorySku: form.inventorySku || undefined
+        };
 
-      await apiClient.updateMenuItem(updatedItem);
+      console.log('Updating menu item:', updatedItem);
+      const result = await apiClient.updateMenuItem(updatedItem);
+      console.log('Update successful:', result);
       onUpdate(updatedItem);
       onClose();
     } catch (error) {
       console.error('Error updating menu item:', error);
-      alert('Failed to update menu item');
+      alert('Failed to update menu item. Check console for details.');
     } finally {
       setLoading(false);
     }
@@ -95,6 +102,22 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
 
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  itemId *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.itemId}
+                  onChange={(e) => setForm(prev => ({ ...prev, itemId: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Unique identifier for this menu item
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Name *
@@ -183,6 +206,22 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
               <span className="ml-2 text-sm text-gray-700">Active</span>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Inventory SKU (optional)
+              </label>
+              <input
+                type="text"
+                value={form.inventorySku}
+                onChange={(e) => setForm(prev => ({ ...prev, inventorySku: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="e.g., MEAT-GB80-5LB"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Provide the SKU from Inventory to link stock tracking to this menu item.
+              </p>
+            </div>
+
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button
                 type="button"
@@ -206,32 +245,64 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
   );
 }
 
+// Helper function to generate random 8-digit string
+const generateRandomItemId = (): string => {
+  return Math.floor(10000000 + Math.random() * 90000000).toString();
+};
+
 export default function MenuAdmin() {
   const [menuItems, setMenuItems] = useState<MenuItemType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItemType | null>(null);
   const [form, setForm] = useState({
-    itemId: '',
+    itemId: generateRandomItemId(),
     name: '',
     price: '',
     active: true,
     imageUrl: '',
     dietaryTags: '',
     description: '',
-    category: ''
+    category: '',
+    inventorySku: ''
   });
 
   useEffect(() => {
     loadMenuItems();
   }, []);
 
+  // Generate new random ID when add form is opened
+  useEffect(() => {
+    if (showAdd) {
+      setForm(prev => ({
+        ...prev,
+        itemId: generateRandomItemId()
+      }));
+    }
+  }, [showAdd]);
+
   const loadMenuItems = async () => {
     try {
-      const data = await apiClient.getMenuItems();
-      setMenuItems(data);
+      console.log('Loading menu items...');
+      const [items, inventory] = await Promise.all([
+        apiClient.getMenuItems(),
+        apiClient.listInventory().catch(() => [] as any[])
+      ]);
+      const skuByItem: Record<string, string> = {};
+      (inventory || []).forEach((inv: any) => {
+        if (inv && inv.itemId && inv.sku) {
+          skuByItem[inv.itemId] = inv.sku;
+        }
+      });
+      const mapped = items.map((mi: any) => ({
+        ...mi,
+        inventorySku: skuByItem[mi.itemId]
+      }));
+      console.log('Loaded menu items with inventory mapping:', mapped);
+      setMenuItems(mapped);
     } catch (error) {
       console.error('Error loading menu items:', error);
+      alert('Failed to load menu items');
     } finally {
       setLoading(false);
     }
@@ -245,7 +316,7 @@ export default function MenuAdmin() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiClient.createMenuItem({
+      const newItem = {
         itemId: form.itemId,
         name: form.name,
         price: parseFloat(form.price),
@@ -253,43 +324,61 @@ export default function MenuAdmin() {
         imageUrl: form.imageUrl,
         dietaryTags: form.dietaryTags,
         description: form.description,
-        category: form.category
-      });
+        category: form.category,
+        inventorySku: form.inventorySku || undefined
+      };
+
+      console.log('Creating menu item:', newItem);
+      const result = await apiClient.createMenuItem(newItem);
+      console.log('Create successful:', result);
+      
       await loadMenuItems();
-      setForm({ itemId: '', name: '', price: '', active: true, imageUrl: '', dietaryTags: '', description: '', category: ''});
+      // Reset form with new random ID for next item
+      setForm({ 
+        itemId: generateRandomItemId(), 
+        name: '', 
+        price: '', 
+        active: true, 
+        imageUrl: '', 
+        dietaryTags: '', 
+        description: '', 
+        category: '',
+        inventorySku: ''
+      });
       setShowAdd(false);
     } catch (error) {
       console.error('Error creating menu item:', error);
-      alert('Failed to create menu item');
+      alert('Failed to create menu item. Check console for details.');
     }
   };
 
-   const handleUpdateItem = (updatedItem: MenuItemType) => {
+  const handleUpdateItem = (updatedItem: MenuItemType) => {
     setMenuItems(prev => prev.map(item => 
       item.itemId === updatedItem.itemId ? updatedItem : item
     ));
   };
 
-    const handleEdit = (item: MenuItemType) => {
+  const handleEdit = (item: MenuItemType) => {
     setEditingItem(item);
   };
 
   const handleToggleActive = async (itemId: string, currentActive: boolean) => {
     try {
-      // Find the existing menu item to preserve all its data
       const existingItem = menuItems.find(item => item.itemId === itemId);
       if (!existingItem) {
         console.error('Menu item not found');
         return;
       }
     
-      // Create updated item with all original data, just toggling active status
       const updatedItem: MenuItem = {
         ...existingItem,
+        itemId: itemId,
         active: !currentActive
       };
-    
-      await apiClient.updateMenuItem(updatedItem);
+
+      console.log('Toggling active status:', updatedItem);
+      const result = await apiClient.updateMenuItem(updatedItem);
+      console.log('Toggle active successful:', result);
       await loadMenuItems();
     } catch (error) {
       console.error('Error updating menu item:', error);
@@ -314,6 +403,13 @@ export default function MenuAdmin() {
     a.download = 'menu.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const regenerateItemId = () => {
+    setForm(prev => ({
+      ...prev,
+      itemId: generateRandomItemId()
+    }));
   };
 
   return (
@@ -369,6 +465,30 @@ export default function MenuAdmin() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Item ID *
+                <button
+                  type="button"
+                  onClick={regenerateItemId}
+                  className="ml-2 text-xs text-indigo-600 hover:text-indigo-500 underline"
+                >
+                  Generate New
+                </button>
+              </label>
+              <input
+                type="text"
+                required
+                value={form.itemId}
+                onChange={(e) => setForm(prev => ({ ...prev, itemId: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="8-digit item ID"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Must be unique. Click "Generate New" for a random ID.
+              </p>
+            </div>
+            
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
               <input
                 type="text"
@@ -395,12 +515,12 @@ export default function MenuAdmin() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full rounded-md border border-gray-300 px-3 py-2"
               >
                 <option value="">Select Category</option>
@@ -415,15 +535,43 @@ export default function MenuAdmin() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-              <input
-                type="url"
-                value={form.imageUrl}
-                onChange={(e) => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                placeholder="https://example.com/image.jpg"
-              />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                <input
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(e) => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
             </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Inventory SKU (optional)</label>
+              <input
+                type="text"
+                value={form.inventorySku}
+                onChange={(e) => setForm(prev => ({ ...prev, inventorySku: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="e.g., MEAT-GB80-5LB"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Provide the SKU from Inventory to link stock tracking to this menu item.
+              </p>
+            </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Inventory ID (optional)</label>
+            <input
+              type="text"
+              value={form.itemId}
+              onChange={(e) => setForm(prev => ({ ...prev, inventoryId: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2"
+              placeholder="Link to inventory row"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the inventory_id to link stock tracking to this menu item.
+            </p>
           </div>
 
           <div className="mb-4">
@@ -585,7 +733,6 @@ export default function MenuAdmin() {
           onUpdate={handleUpdateItem}
         />
       )}
-
     </div>
   );
 }

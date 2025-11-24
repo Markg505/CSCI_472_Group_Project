@@ -110,6 +110,19 @@ function todayISO(): string {
   return new Date().toISOString().slice(0,10);
 }
 
+function safeRandomId(): string {
+  try {
+    // crypto.randomUUID is not available in some browsers (e.g., older WebView)
+    // fall back to a timestamp/random-based id.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c: any = (globalThis as any).crypto;
+    if (c && typeof c.randomUUID === "function") {
+      return c.randomUUID().toString();
+    }
+  } catch {}
+  return `inv-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
 function seed(): InventoryItem[] {
   const rows: InventoryItem[] = [
     {
@@ -185,7 +198,7 @@ export async function listInventory(): Promise<InventoryItem[]> {
 }
 
 export async function addInventoryItem(item: NewInventoryItem): Promise<InventoryItem> {
-  const row: InventoryItem = { ...item, id: crypto.randomUUID().toString() };
+  const row: InventoryItem = { ...item, id: safeRandomId() };
   INVENTORY.unshift(row);
   save();
   return structuredClone(row);

@@ -84,7 +84,7 @@ public class InventoryDAO {
         inventory.setCreatedUtc(rs.getString("created_utc"));
 
         // Set related menu item if available
-        if (rs.getString("menu_item_name") != null) {
+        if (rs.getString("item_id") != null) {
             MenuItem menuItem = new MenuItem();
             menuItem.setItemId(rs.getString("item_id"));
             menuItem.setName(rs.getString("menu_item_name"));
@@ -128,16 +128,41 @@ public class InventoryDAO {
     }
 
     public boolean decrementInventory(String itemId, int quantity) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection(context)) {
+            return decrementInventory(itemId, quantity, conn);
+        }
+    }
+
+    public boolean decrementInventory(String itemId, int quantity, Connection conn) throws SQLException {
         String sql = "UPDATE inventory SET qty_on_hand = qty_on_hand - ?, last_counted_at = datetime('now') " +
                 "WHERE item_id = ? AND qty_on_hand >= ?";
 
-        try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, quantity);
             pstmt.setString(2, itemId);
             pstmt.setInt(3, quantity);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
 
+    public boolean linkInventoryBySku(String sku, String itemId) throws SQLException {
+        if (sku == null || sku.isBlank() || itemId == null || itemId.isBlank()) return false;
+        String sql = "UPDATE inventory SET item_id = ? WHERE sku = ?";
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, itemId);
+            pstmt.setString(2, sku);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean linkInventoryById(String inventoryId, String itemId) throws SQLException {
+        if (inventoryId == null || inventoryId.isBlank() || itemId == null || itemId.isBlank()) return false;
+        String sql = "UPDATE inventory SET item_id = ? WHERE inventory_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, itemId);
+            pstmt.setString(2, inventoryId);
             return pstmt.executeUpdate() > 0;
         }
     }
@@ -167,7 +192,7 @@ public class InventoryDAO {
                 "qty_on_hand, par_level, reorder_point, cost, location, active, vendor, " +
                 "lead_time_days, preferred_order_qty, waste_qty, last_counted_at, count_freq, " +
                 "lot, expiry_date, allergen, conversion) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {

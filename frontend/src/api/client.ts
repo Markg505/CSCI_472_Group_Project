@@ -2,6 +2,7 @@ const BASE = (import.meta as any)?.env?.BASE_URL || '/';
 const API_BASE = `${BASE}api`;
 
 const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
+const MAX_HISTORY_PAGE_SIZE = 100;
 
 
 export interface User {
@@ -21,6 +22,7 @@ export interface DiningTable {
 export interface Reservation {
   reservationId?: string;
   userId?: string;
+  guestName?: string;
   tableId: string;
   startUtc: string;
   endUtc: string;
@@ -98,6 +100,41 @@ export interface OrderItem {
   unitPrice: number;
   lineTotal: number;
   notes?: string;
+  menuItem?: { name?: string };
+}
+
+export interface CartMergeRequest {
+  cartToken?: string;
+  items: Array<{ itemId: string; qty: number; unitPrice?: number; name?: string }>;
+}
+
+export interface CartMergeResponse {
+  orderId?: string;
+  cartToken?: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  conflicts?: {
+    dropped?: Array<{ itemId: string; name?: string; reason?: string; requested?: number; applied?: number }>;
+    clamped?: Array<{ itemId: string; name?: string; reason?: string; requested?: number; applied?: number }>;
+    merged?: Array<{ itemId: string; name?: string; reason?: string; requested?: number; applied?: number }>;
+  };
+}
+
+export interface LoginResponse {
+  user: User;
+  cartToken?: string;
+  cart?: CartMergeResponse;
+}
+
+export interface HistoryResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  retentionMonths: number;
+  retentionHorizon: string;
 }
 export interface InventoryItem  {
   id: string;
@@ -170,19 +207,69 @@ export interface MenuPerformance {
   totalMenuItems: number;
   activeMenuItems: number;
 }
+export interface BookingSettings {
+  openTime: string;                 
+  closeTime: string;                
+  daysOpen: { [k: string]: boolean }; 
+  maxDaysOut: number;               
+  reservationLengthMinutes: number; 
+  slotIntervalMinutes?: number;     
+}
 
 class ApiClient {
   private baseURL = API_BASE;
 
+  private getCartToken() {
+    try {
+      return localStorage.getItem('rbos_cart_token');
+    } catch {
+      return null;
+    }
+  }
+
+  private persistCartToken(token: string | null | undefined) {
+    try {
+      if (token) {
+        localStorage.setItem('rbos_cart_token', token);
+      } else {
+        localStorage.removeItem('rbos_cart_token');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  private boundedPageSize(requested?: number) {
+    if (!requested || requested < 1) return 20;
+    return Math.min(requested, MAX_HISTORY_PAGE_SIZE);
+  }
+
+  private historyQuery(params: Record<string, string | number | undefined>) {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        search.set(key, String(value));
+      }
+    });
+    return search.toString() ? `?${search.toString()}` : '';
+  }
+
   private async request(endpoint: string, options: RequestInit = {}) {
+    const cartToken = this.getCartToken();
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       headers: {
         'Accept': 'application/json',
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(cartToken ? { 'X-Cart-Token': cartToken } : {}),
         ...options.headers,
       },
       ...options,
     });
+
+    const responseCartToken = response.headers.get('x-cart-token');
+    if (responseCartToken) {
+      this.persistCartToken(responseCartToken);
+    }
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
@@ -192,6 +279,10 @@ class ApiClient {
     const ct = response.headers.get('content-type') || '';
     if (ct.includes('application/json')) return response.json();
     return null;
+  }
+
+  updateCartToken(token: string | null) {
+    this.persistCartToken(token);
   }
 async listUsers(): Promise<User[]> {
   return this.request('/users') as Promise<User[]>;
@@ -236,9 +327,24 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
   async updateTable(table: DiningTable): Promise<DiningTable> {
     return this.request(`/tables/${table.tableId}`, { method: 'PUT', body: JSON.stringify(table) });
   }
+  async deleteTable(tableId: string): Promise<void> {
+    await this.request(`/tables/${tableId}`, { method: 'DELETE' });
+  }
 
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
+  }
+
+  async getReservationHistory(params: { status?: string; startUtc?: string; endUtc?: string; userId?: string; page?: number; pageSize?: number; }): Promise<HistoryResult<Reservation>> {
+    const query = this.historyQuery({
+      status: params.status,
+      start_utc: params.startUtc,
+      end_utc: params.endUtc,
+      userId: params.userId,
+      page: params.page || 1,
+      pageSize: this.boundedPageSize(params.pageSize),
+    });
+    return this.request(`/reservations/history${query}`);
   }
   async listInventory(): Promise<InventoryItem[]> {
     return this.request('/inventory');
@@ -264,8 +370,8 @@ async deleteReservation(reservationId: string): Promise<void> {
 }
 
 async getReservationsForUser(userId: string) {
-  const all = await this.getReservations();
-  return (all || []).filter(r => r.userId === userId);
+  const history = await this.getReservationHistory({ userId, pageSize: 50 });
+  return history.items;
 }
 
 async updateReservationStatus(reservationId: string, status: string): Promise<Reservation> {
@@ -287,13 +393,19 @@ async updateReservationStatus(reservationId: string, status: string): Promise<Re
     return this.request('/menu/active');
   }
 
-  async createMenuItem(menuItem: Omit<MenuItem, 'id'>): Promise<MenuItem> {
-    return this.request('/menu', { method: 'POST', body: JSON.stringify(menuItem) });
-  }
+  async createMenuItem(menuItem: MenuItem): Promise<MenuItem> {
+  return this.request('/menu', { 
+    method: 'POST', 
+    body: JSON.stringify(menuItem) 
+  }) as Promise<MenuItem>;
+}
 
   async updateMenuItem(menuItem: MenuItem): Promise<MenuItem> {
-    return this.request(`/menu/${menuItem.itemId}`, { method: 'PUT', body: JSON.stringify(menuItem) });
-  }
+  return this.request(`/menu/${menuItem.itemId}`, { 
+    method: 'PUT', 
+    body: JSON.stringify(menuItem) 
+  }) as Promise<MenuItem>;
+}
 
   async deleteMenuItem(itemId: string): Promise<void> {
     await this.request(`/menu/${itemId}`, { method: 'DELETE' });
@@ -313,6 +425,16 @@ async updateReservationStatus(reservationId: string, status: string): Promise<Re
   async getOrderById(orderId: string): Promise<Order> {
       return this.request(`/orders/${orderId}`);
   }
+  async getBookingSettings(): Promise<BookingSettings> {
+  return this.request('/booking-settings');
+}
+
+async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings> {
+  return this.request('/booking-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
 
   async getAllOrders(): Promise<Order[]> {
       return this.request('/orders');
@@ -348,17 +470,57 @@ async updateReservationStatus(reservationId: string, status: string): Promise<Re
     return this.request('/orders', { method: 'POST', body: JSON.stringify(order) });
   }
 
+  async mergeCart(payload: CartMergeRequest): Promise<CartMergeResponse> {
+    const body: CartMergeRequest = {
+      ...payload,
+      cartToken: payload.cartToken ?? this.getCartToken() ?? undefined,
+    };
+    const response = await this.request('/orders/cart', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }) as CartMergeResponse;
+    if (response?.cartToken) {
+      this.persistCartToken(response.cartToken);
+    }
+    return response;
+  }
+
+  async getCart(cartToken?: string): Promise<CartMergeResponse> {
+    const response = await this.request('/orders/cart', {
+      headers: cartToken ? { 'X-Cart-Token': cartToken } : undefined
+    }) as CartMergeResponse;
+    if (response?.cartToken) {
+      this.persistCartToken(response.cartToken);
+    }
+    return response;
+  }
+
+  async getOrderHistory(params: { status?: string; startUtc?: string; endUtc?: string; userId?: string; page?: number; pageSize?: number; }): Promise<HistoryResult<Order>> {
+    const query = this.historyQuery({
+      status: params.status,
+      start_utc: params.startUtc,
+      end_utc: params.endUtc,
+      userId: params.userId,
+      page: params.page || 1,
+      pageSize: this.boundedPageSize(params.pageSize),
+    });
+    return this.request(`/orders/history${query}`);
+  }
+
   async getOrdersByStatus(status: string): Promise<Order[]> {
     return this.request(`/orders/status/${status}`);
   }
 
   async getOrdersByUser(userId: string): Promise<Order[]> {
-    return this.request(`/orders/user/${userId}`);
+    const history = await this.getOrderHistory({ userId, pageSize: 50 });
+    return history.items;
   }
 
   async updateOrderStatus(orderId: string, status: string): Promise<Order> {
-    return this.request(`/orders/${orderId}/status`, {
+    const params = new URLSearchParams({ status });
+    return this.request(`/orders/${orderId}/status?${params.toString()}`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
   }

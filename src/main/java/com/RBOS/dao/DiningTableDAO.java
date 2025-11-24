@@ -94,22 +94,20 @@ public class DiningTableDAO {
     }
     
     public String createTable(DiningTable table) throws SQLException {
-        String sql = "INSERT INTO dining_tables (name, capacity) VALUES (?, ?)";
+        String tableId = table.getTableId() != null ? table.getTableId() : java.util.UUID.randomUUID().toString();
+        String sql = "INSERT INTO dining_tables (table_id, name, capacity) VALUES (?, ?, ?)";
         
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             
-            pstmt.setString(1, table.getName());
-            pstmt.setInt(2, table.getCapacity());
+            pstmt.setString(1, tableId);
+            pstmt.setString(2, table.getName());
+            pstmt.setInt(3, table.getCapacity());
             
             int affectedRows = pstmt.executeUpdate();
             
             if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getString(1);
-                    }
-                }
+                return tableId;
             }
         }
         return null;
@@ -125,6 +123,15 @@ public class DiningTableDAO {
             pstmt.setInt(2, table.getCapacity());
             pstmt.setString(3, table.getTableId());
             
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean deleteTable(String tableId) throws SQLException {
+        String sql = "DELETE FROM dining_tables WHERE table_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, tableId);
             return pstmt.executeUpdate() > 0;
         }
     }

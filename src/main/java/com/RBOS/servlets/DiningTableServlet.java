@@ -70,6 +70,9 @@ public class DiningTableServlet extends HttpServlet {
         
         try {
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
+            if (table.getName() == null || table.getName().isBlank()) {
+                table.setName("Table " + (int)(Math.random() * 1000));
+            }
             String tableId = diningTableDAO.createTable(table);
             
             if (tableId != null) {
@@ -117,6 +120,28 @@ public class DiningTableServlet extends HttpServlet {
             e.printStackTrace();
         } catch (NumberFormatException e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            String pathInfo = request.getPathInfo();
+            if (pathInfo == null || pathInfo.split("/").length != 2) {
+                response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+                return;
+            }
+            String tableId = pathInfo.split("/")[1];
+            boolean success = diningTableDAO.deleteTable(tableId);
+            if (success) {
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+            } else {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            }
+        } catch (SQLException e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            e.printStackTrace();
         }
     }
 }

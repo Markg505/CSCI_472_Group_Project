@@ -1,6 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiClient, type DiningTable, type Reservation } from '../api/client';
 import { useAuth } from '../features/auth/useAuth';
+
+type BookingSettings = {
+  openTime: string;
+  closeTime: string;
+  daysOpen: { [k: string]: boolean };
+  maxDaysOut: number;
+  reservationLengthMinutes: number;
+};
+
+const DEFAULT_SETTINGS: BookingSettings = {
+  openTime: '09:00',
+  closeTime: '21:00',
+  daysOpen: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: false },
+  maxDaysOut: 30,
+  reservationLengthMinutes: 90,
+};
+
+function isoToLocalDate(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, '0');
+  const D = String(d.getDate()).padStart(2, '0');
+  return `${Y}-${M}-${D}`;
+}
+
+function formatTimeFromISO(iso?: string) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function combineDateTimeISO(date: string, time: string) {
+  if (!date || !time) return '';
+  const d = new Date(`${date}T${time}:00`);
+  return d.toISOString();
+}
+
+function addMinutesToISO(iso: string, minutes: number) {
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() + minutes);
+  return d.toISOString();
+}
+
+function parseTimeToParts(t: string) {
+  const [hh, mm] = (t || '00:00').split(':').map(s => parseInt(s, 10));
+  return { hh: isNaN(hh) ? 0 : hh, mm: isNaN(mm) ? 0 : mm };
+}
+
+const LOCAL_SETTINGS_KEY = 'rbos_booking_settings';
 
 export default function ReservationsPage() {
   const { user } = useAuth();
@@ -8,89 +60,198 @@ export default function ReservationsPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [availableTables, setAvailableTables] = useState<DiningTable[]>([]);
+  const [tables, setTables] = useState<DiningTable[]>([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [myReservations, setMyReservations] = useState<Reservation[]>([]);
-  const [editing, setEditing] = useState<Record<number, Reservation>>({});
+  const [editing, setEditing] = useState<Record<string, Reservation>>({});
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // new form shape: date + startTime (dropdown) + computed end time
   const [form, setForm] = useState({
     userId: uid,
     tableId: '',
-    startUtc: '',
-    endUtc: '',
+    date: '',
+    startTime: '',
     partySize: '2',
     notes: '',
   });
 
-  // Check availability when dates or party size change
-  useEffect(() => {
-    const checkAvailability = async () => {
-      if (form.startUtc && form.endUtc && form.partySize) {
-        setCheckingAvailability(true);
-        try {
-          const partySize = parseInt(form.partySize);
-          const tables = await apiClient.getAvailableTables(
-            form.startUtc,
-            form.endUtc,
-            partySize
-          );
-          setAvailableTables(tables);
-        } catch (error) {
-          console.error('Error checking availability:', error);
-        } finally {
-          setCheckingAvailability(false);
-        }
-      }
-    };
+  const [settings, setSettings] = useState<BookingSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
-    const timeoutId = setTimeout(checkAvailability, 500);
-    return () => clearTimeout(timeoutId);
-  }, [form.startUtc, form.endUtc, form.partySize]);
+  useEffect(() => { setForm(f => ({ ...f, userId: uid })); }, [uid]);
 
-  useEffect(() => {
-    setForm(f => ({ ...f, userId: uid }));
-  }, [uid]);
-
+  // load all reservations + my reservations + settings on mount
   useEffect(() => {
     (async () => {
       try {
         const all = await apiClient.getReservations();
-        const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+        setReservations(all ?? []);
+        const mine = (all ?? []).filter(r => String(r.userId ?? '') === String(uid));
         setMyReservations(mine);
       } catch (e) {
-        console.error(e);
+        console.error('Failed to load reservations', e);
       }
     })();
+    (async () => {
+      try {
+        const tbls = await apiClient.getTables();
+        setTables(tbls ?? []);
+      } catch (err) {
+        console.error('Failed to load tables', err);
+      }
+    })();
+    loadSettings();
   }, [uid]);
+
+  async function loadSettings() {
+    setSettingsLoading(true);
+    const ac: any = apiClient;
+    try {
+      if (ac && typeof ac.getBookingSettings === 'function') {
+        try {
+          const s = await ac.getBookingSettings();
+          setSettings(s ?? DEFAULT_SETTINGS);
+        } catch (err) {
+          const local = localStorage.getItem(LOCAL_SETTINGS_KEY);
+          setSettings(local ? JSON.parse(local) : DEFAULT_SETTINGS);
+        }
+      } else {
+        const local = localStorage.getItem(LOCAL_SETTINGS_KEY);
+        setSettings(local ? JSON.parse(local) : DEFAULT_SETTINGS);
+      }
+    } catch (err) {
+      console.warn('loadSettings fallback', err);
+      setSettings(DEFAULT_SETTINGS);
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  // generate slots for a given date using settings + existing reservations
+  function generateSlotsForDate(date: string) {
+    if (!settings || !date) return [] as string[];
+    const si = 30; // fixed 30-minute slots
+    const startDT = new Date(`${date}T${settings.openTime}:00`);
+    const endDT = new Date(`${date}T${settings.closeTime}:00`);
+    if (endDT <= startDT) endDT.setDate(endDT.getDate() + 1);
+
+    // check day open
+    const wd = new Date(`${date}T00:00:00`).getDay();
+    const map = ['sun','mon','tue','wed','thu','fri','sat'];
+    if (!settings.daysOpen[map[wd]]) return [];
+
+    const slots: string[] = [];
+    for (let cur = new Date(startDT); cur < endDT; cur.setMinutes(cur.getMinutes() + si)) {
+      const slotStartISO = cur.toISOString();
+      const slotEndISO = addMinutesToISO(slotStartISO, settings.reservationLengthMinutes);
+      // check conflict (if any existing reservation overlaps this slot)
+      const conflict = reservations.some(r => {
+        if (!r.startUtc || !r.endUtc) return false;
+        const rs = new Date(r.startUtc).getTime();
+        const re = new Date(r.endUtc).getTime();
+        const ss = new Date(slotStartISO).getTime();
+        const se = new Date(slotEndISO).getTime();
+        return !(se <= rs || ss >= re);
+      });
+      if (!conflict) {
+        const hh = String(cur.getHours()).padStart(2,'0');
+        const mm = String(cur.getMinutes()).padStart(2,'0');
+        slots.push(`${hh}:${mm}`);
+      }
+    }
+    return slots;
+  }
+
+  const slotOptionsForSelectedDate = useMemo(() => generateSlotsForDate(form.date), [form.date, reservations, settings]);
+
+  // computed start/end ISO and end time string
+  const computedStartIso = useMemo(() => {
+    if (!form.date || !form.startTime) return '';
+    return combineDateTimeISO(form.date, form.startTime);
+  }, [form.date, form.startTime]);
+
+  const computedEndIso = useMemo(() => {
+    if (!computedStartIso || !settings) return '';
+    return addMinutesToISO(computedStartIso, settings.reservationLengthMinutes);
+  }, [computedStartIso, settings]);
+
+  const computedEndTime = useMemo(() => formatTimeFromISO(computedEndIso), [computedEndIso]);
+
+  // debounce availability check when date/startTime/partySize change
+  useEffect(() => {
+    let mounted = true;
+    const checkAvailability = async () => {
+      if (!computedStartIso || !computedEndIso || !form.partySize) {
+        setAvailableTables([]);
+        return;
+      }
+      setCheckingAvailability(true);
+      try {
+        const partySize = parseInt(form.partySize || '2');
+        const available = await apiClient.getAvailableTables(computedStartIso, computedEndIso, partySize);
+        if (!mounted) return;
+        const tableMap = new Map((tables ?? []).map(t => [String(t.tableId), t]));
+        const filtered = (available ?? []).map(t => {
+          const match = tableMap.get(String(t.tableId));
+          return match ? match : t;
+        }).filter((t, idx, arr) =>
+          arr.findIndex(x => String(x.tableId) === String(t.tableId)) === idx
+        );
+        setAvailableTables(filtered);
+      } catch (err) {
+        console.error('Error checking availability:', err);
+        if (mounted) setAvailableTables([]);
+      } finally {
+        if (mounted) setCheckingAvailability(false);
+      }
+    };
+
+    const id = setTimeout(checkAvailability, 500);
+    return () => { mounted = false; clearTimeout(id); };
+  }, [computedStartIso, computedEndIso, form.partySize]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!computedStartIso || !computedEndIso) {
+      alert('Please pick a date and a start time.');
+      return;
+    }
+    if (!form.tableId) {
+      alert('Please select a table.');
+      return;
+    }
+
     setSubmitting(true);
-    
     try {
       const reservationData: Reservation = {
         userId: uid,
         tableId: form.tableId,
-        startUtc: form.startUtc,
-        endUtc: form.endUtc,
+        startUtc: computedStartIso,
+        endUtc: computedEndIso,
         partySize: parseInt(form.partySize),
         notes: form.notes,
-        status: 'pending'
+        status: 'pending',
       };
 
       await apiClient.createReservation(reservationData);
       alert('Reservation request sent! We will confirm shortly.');
-      
+
+      // reload reservations and my reservations
+      const all = await apiClient.getReservations();
+      setReservations(all ?? []);
+      const mine = (all ?? []).filter(r => String(r.userId ?? '') === String(uid));
+      setMyReservations(mine);
+
       setForm({
         userId: uid,
-        tableId: '0',
-        startUtc: '',
-        endUtc: '',
+        tableId: '',
+        date: '',
+        startTime: '',
         partySize: '2',
         notes: '',
       });
       setAvailableTables([]);
-      const all = await apiClient.getReservations();
-      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
-      setMyReservations(mine);
     } catch (error) {
       console.error('Error creating reservation:', error);
       alert('Failed to create reservation. Please try again.');
@@ -99,16 +260,7 @@ export default function ReservationsPage() {
     }
   };
 
-  const updateForm = (key: string, val: any) => {
-    setForm(prev => ({ ...prev, [key]: val }));
-  };
-
-  const getMinDateTime = () => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  };
-
+  // editing helpers (unchanged)
   const startEdit = (r: Reservation) => {
     if (!r.reservationId) return;
     setEditing(prev => ({ ...prev, [r.reservationId!]: { ...r } }));
@@ -125,8 +277,9 @@ export default function ReservationsPage() {
       await apiClient.updateReservation(draft);
       setEditing(prev => { const c = { ...prev }; delete c[id]; return c; });
       const all = await apiClient.getReservations();
-      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+      const mine = (all ?? []).filter(r => String(r.userId ?? '') === String(uid));
       setMyReservations(mine);
+      setReservations(all ?? []);
     } catch (e) {
       console.error(e);
       alert('Failed to save changes.');
@@ -141,13 +294,33 @@ export default function ReservationsPage() {
     try {
       await apiClient.updateReservationStatus(id, 'cancelled');
       const all = await apiClient.getReservations();
-      const mine = (all ?? []).filter(r => (r.userId ?? 0) === uid);
+      const mine = (all ?? []).filter(r => String(r.userId ?? '') === String(uid));
       setMyReservations(mine);
+      setReservations(all ?? []);
     } catch (e) {
       console.error(e);
       alert('Failed to cancel reservation.');
     }
   };
+
+  // date min/max for picker based on settings
+  const dateMin = useMemo(() => {
+    const now = new Date();
+    const Y = now.getFullYear();
+    const M = String(now.getMonth() + 1).padStart(2, '0');
+    const D = String(now.getDate()).padStart(2, '0');
+    return `${Y}-${M}-${D}`;
+  }, []);
+
+  const dateMax = useMemo(() => {
+    if (!settings) return '';
+    const now = new Date();
+    now.setDate(now.getDate() + (settings.maxDaysOut ?? DEFAULT_SETTINGS.maxDaysOut));
+    const Y = now.getFullYear();
+    const M = String(now.getMonth() + 1).padStart(2, '0');
+    const D = String(now.getDate()).padStart(2, '0');
+    return `${Y}-${M}-${D}`;
+  }, [settings]);
 
   return (
     <>
@@ -183,69 +356,79 @@ export default function ReservationsPage() {
                     min="1"
                     max="20"
                     value={form.partySize}
-                    onChange={(e) => updateForm('partySize', e.target.value)}
+                    onChange={(e) => setForm(prev => ({ ...prev, partySize: e.target.value }))}
                     className="input"
                     placeholder="2"
                   />
                 </Field>
 
-                <Field label="Start Time">
+                <Field label="Date">
                   <input
                     required
-                    type="datetime-local"
-                    value={form.startUtc}
-                    onChange={(e) => updateForm('startUtc', e.target.value)}
-                    min={getMinDateTime()}
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm(prev => ({ ...prev, date: e.target.value, startTime: '' }))}
+                    min={dateMin}
+                    max={dateMax || undefined}
                     className="input"
                   />
                 </Field>
 
-                <Field label="End Time">
-                  <input
-                    required
-                    type="datetime-local"
-                    value={form.endUtc}
-                    onChange={(e) => updateForm('endUtc', e.target.value)}
-                    min={form.startUtc || getMinDateTime()}
+                <Field label="Start Time">
+                  <select
+                    value={form.startTime}
+                    onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value }))}
                     className="input"
-                  />
+                  >
+                    <option value="">Choose time</option>
+                    {slotOptionsForSelectedDate.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </Field>
               </div>
 
-              {/* Available Tables */}
-              <Field label="Available Tables">
-                {checkingAvailability ? (
-                  <div className="text-sm text-neutral-500">Checking availability...</div>
-                ) : availableTables.length > 0 ? (
-                  <select
-                    required
-                    value={form.tableId}
-                    onChange={(e) => updateForm('tableId', e.target.value)}
-                    className="input"
-                  >
-                    <option value="">Select a table</option>
-                    {availableTables.map(table => (
-                      <option key={table.tableId} value={table.tableId}>
-                        {table.name} (Seats {table.capacity})
-                      </option>
-                    ))}
-                  </select>
-                ) : form.startUtc && form.endUtc ? (
-                  <div className="text-sm text-rose-600">
-                    No tables available for the selected time and party size
-                  </div>
-                ) : (
-                  <div className="text-sm text-neutral-500">
-                    Select date and time to see available tables
-                  </div>
-                )}
-              </Field>
+              {/* End Time display */}
+              <div className="grid md:grid-cols-2 gap-5 md:gap-6">
+                <Field label="End Time">
+                  <div className="input">{computedEndTime || '—'}</div>
+                </Field>
+
+                <Field label="Available Tables">
+                  {checkingAvailability ? (
+                    <div className="text-sm text-neutral-500">Checking availability...</div>
+                  ) : availableTables.length > 0 ? (
+                    <select
+                      required
+                      value={form.tableId}
+                      onChange={(e) => setForm(prev => ({ ...prev, tableId: e.target.value }))}
+                      className="input"
+                    >
+                      <option value="">Select a table</option>
+                      {availableTables.map(table => {
+                        const matched = tables.find(t => String(t.tableId) === String(table.tableId)) || table;
+                        return (
+                          <option key={matched.tableId} value={matched.tableId}>
+                            {matched.name || `Table ${matched.tableId}`} (Seats {matched.capacity})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : form.date && form.startTime ? (
+                    <div className="text-sm text-rose-600">
+                      No tables available for the selected time and party size
+                    </div>
+                  ) : (
+                    <div className="text-sm text-neutral-500">
+                      Select date and time to see available tables
+                    </div>
+                  )}
+                </Field>
+              </div>
 
               {/* Additional Notes */}
               <Field label="Special Requests (Optional)">
                 <textarea
                   value={form.notes}
-                  onChange={(e) => updateForm('notes', e.target.value)}
+                  onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                   className="input resize-none"
                   placeholder="Any special requirements or celebrations..."
@@ -268,8 +451,8 @@ export default function ReservationsPage() {
               {myReservations.length === 0 ? (
                 <div className="text-sm text-neutral-500">You have no reservations yet.</div>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <table className="w-full border-collapse text-sm">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full min-w-[720px] border-collapse text-sm">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
                         <th className="px-3 py-2 text-left">ID</th>

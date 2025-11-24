@@ -1,7 +1,7 @@
 # Rebuild database from schema.sql
 $schemaPath = "src\main\resources\backend\schema.sql"
 $seedDbPath = "src\main\resources\backend\restaurant.db"
-$sqliteJar = "src\main\webapp\WEB-INF\lib\sqlite-jdbc-3.50.3.0.jar"
+$sqliteJar = "lib\sqlite-jdbc-3.50.3.0.jar"
 
 # Read schema SQL
 $sql = Get-Content $schemaPath -Raw
