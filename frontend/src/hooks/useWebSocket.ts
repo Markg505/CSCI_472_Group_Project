@@ -54,12 +54,17 @@ export const useWebSocket = () => {
       };
       
       ws.current.onmessage = (event) => {
+        const raw = event.data;
+        if (typeof raw !== 'string') {
+          console.warn('Ignoring non-text WebSocket frame');
+          return;
+        }
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
+          const message: WebSocketMessage = JSON.parse(raw);
           setLastMessage(message);
           console.log('WebSocket message:', message);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('Error parsing WebSocket message:', error, 'payload:', raw);
         }
       };
     } catch (error) {

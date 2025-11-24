@@ -1,5 +1,8 @@
 package com.RBOS.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MenuItem {
     private String itemId;
     private String name;

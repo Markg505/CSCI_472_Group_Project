@@ -1,5 +1,6 @@
 package com.RBOS.dao;
 
+import com.RBOS.models.MenuItem;
 import com.RBOS.models.OrderItem;
 import com.RBOS.utils.DatabaseConnection;
 import jakarta.servlet.ServletContext;
@@ -16,7 +17,7 @@ public class OrderItemDAO {
     
     public List<OrderItem> getOrderItemsByOrderId(String orderId) throws SQLException {
         List<OrderItem> orderItems = new ArrayList<>();
-        String sql = "SELECT oi.*, mi.name as item_name " +
+        String sql = "SELECT oi.*, mi.name as item_name, mi.price as item_price " +
                     "FROM order_items oi " +
                     "JOIN menu_items mi ON oi.item_id = mi.item_id " +
                     "WHERE oi.order_id = ? " +
@@ -38,6 +39,11 @@ public class OrderItemDAO {
                     rs.getDouble("line_total"),
                     rs.getString("notes")
                 );
+                MenuItem menuItem = new MenuItem();
+                menuItem.setItemId(orderItem.getItemId());
+                menuItem.setName(rs.getString("item_name"));
+                menuItem.setPrice(rs.getDouble("item_price"));
+                orderItem.setMenuItem(menuItem);
                 orderItems.add(orderItem);
             }
         }
@@ -117,11 +123,15 @@ public class OrderItemDAO {
     }
     
     public boolean deleteOrderItemsByOrderId(String orderId) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection(context)) {
+            return deleteOrderItemsByOrderId(orderId, conn);
+        }
+    }
+
+    public boolean deleteOrderItemsByOrderId(String orderId, Connection conn) throws SQLException {
         String sql = "DELETE FROM order_items WHERE order_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, orderId);
             return pstmt.executeUpdate() > 0;
         }

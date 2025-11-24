@@ -47,22 +47,28 @@ public class WebSocketConfig {
     }
     
     public static void broadcastToAdmins(String type, String message) {
-        String jsonMessage = String.format(
-            "{\"type\":\"%s\",\"message\":\"%s\",\"timestamp\":%d}",
-            type, message, System.currentTimeMillis()
-        );
-        
-        System.out.println("Broadcasting to " + sessions.size() + " clients: " + jsonMessage);
-        
-        sessions.forEach(session -> {
-            if (session.isOpen()) {
-                try {
-                    session.getBasicRemote().sendText(jsonMessage);
-                } catch (Exception e) {
-                    System.err.println("Failed to send message to session " + session.getId() + ": " + e.getMessage());
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("type", type);
+            payload.put("message", message);
+            payload.put("timestamp", System.currentTimeMillis());
+            String jsonMessage = mapper.writeValueAsString(payload);
+
+            System.out.println("Broadcasting to " + sessions.size() + " clients: " + jsonMessage);
+
+            sessions.forEach(session -> {
+                if (session.isOpen()) {
+                    try {
+                        session.getBasicRemote().sendText(jsonMessage);
+                    } catch (Exception e) {
+                        System.err.println("Failed to send message to session " + session.getId() + ": " + e.getMessage());
+                    }
                 }
-            }
-        });
+            });
+        } catch (Exception e) {
+            System.err.println("Failed to broadcast WebSocket message: " + e.getMessage());
+        }
     }
     
     public static void notifyNewReservation(String reservationData) {

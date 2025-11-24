@@ -1,4 +1,6 @@
-<project name="RBOS" default="package-war" basedir=".">
+<project name="RBOS" default="package-war" basedir="." xmlns:jacoco="antlib:org.jacoco.ant">
+
+    <property environment="env"/>
 
     <property name="src.dir" value="src"/>
     <property name="frontend.dir" value="${basedir}/frontend"/>
@@ -7,12 +9,26 @@
     <property name="webcontent.dir" value="${src.dir}/main/webapp"/>
     <property name="webinf.dir" value="${webcontent.dir}/WEB-INF"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
-    <property name="lib.dir" value="${webinf.dir}/lib"/>
+    
+    <property name="lib.dir" value="${basedir}/lib"/>
+    <property name="test.src.dir" value="${src.dir}/test/java"/>
     <property name="war.file" value="${dist.dir}/${ant.project.name}.war"/>
+
+    <property name="reports.dir" value="${build.dir}/reports"/>
+    <property name="test.classes.dir" value="${build.dir}/test-classes"/>
+    <property name="test.reports.dir" value="${reports.dir}/tests"/>
+    <property name="jacoco.report.dir" value="${reports.dir}/jacoco"/>
+    <property name="jacoco.exec.file" value="${build.dir}/jacoco.exec"/>
+    <property name="jacoco.instrumented.dir" value="${build.dir}/classes-instrumented"/>
+    <property name="jacoco.line.coverage.minimum" value="0.0"/>
 
     <property name="java17.home" value="../../Program Files/Java/jdk-17"/>
 
-    <property name="glassfish.home" value="../glassfish7"/>
+    <condition property="glassfish.home" value="${env.GLASSFISH_HOME}">
+        <isset property="env.GLASSFISH_HOME"/>
+    </condition>
+    <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+
     <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
     <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
     <property name="jakarta.activation.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.activation-api.jar"/>
@@ -36,6 +52,27 @@
         <pathelement location="${jakarta.websocket.client.api.jar}"/>
         <pathelement location="${websocket.api.osgi.jar}"/>
         <pathelement location="${websocket.osgi.jar}"/>
+    </path>
+
+    <path id="junit.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="junit-4.*.jar"/>
+            <include name="hamcrest-*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="test.classpath">
+        <path refid="compile.classpath"/>
+        <path refid="junit.classpath"/>
+        <pathelement location="${classes.dir}"/>
+        <pathelement location="${test.classes.dir}"/>
+    </path>
+
+    <path id="jacoco.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="jacocoant.jar"/>
+            <include name="org.jacoco.ant-*.jar"/>
+        </fileset>
     </path>
 
     <target name="clean">
@@ -75,9 +112,34 @@
         <fail if="db.in.repo" message="RBOS_DB must be outside the repo (e.g., ${user.home}/.rbos/restaurant.db)."/>
     </target>
 
-    <target name="bootstrap-db">
+    <target name="-refresh-db" if="refresh.db">
+        <echo message="refresh.db=true set; deleting ${RBOS_DB} before regeneration."/>
+        <delete file="${RBOS_DB}" quiet="true" failonerror="false"/>
+    </target>
+
+    <target name="-init-schema" if="live.db.missing">
+        <echo message="No seed DB found; generating ${RBOS_DB} from schema.sql"/>
+        <sql driver="org.sqlite.JDBC"
+             url="jdbc:sqlite:${RBOS_DB}"
+             userid=""
+             password=""
+             src="${basedir}/src/main/resources/backend/schema.sql"
+             autocommit="true"
+             classpathref="compile.classpath"
+             delimiter=";"
+             onerror="abort"/>
+    </target>
+
+    <target name="bootstrap-db" depends="-refresh-db">
         <mkdir dir="${RBOS_DIR}"/>
-        <copy file="${SEED_DB}" tofile="${RBOS_DB}" overwrite="false" verbose="true"/>
+        <!-- best effort copy; ignore if seed file is missing -->
+        <copy file="${SEED_DB}" tofile="${RBOS_DB}" overwrite="false" verbose="true" failonerror="false"/>
+        <condition property="live.db.missing">
+            <not>
+                <available file="${RBOS_DB}"/>
+            </not>
+        </condition>
+        <antcall target="-init-schema"/>
         <echo>Live DB: ${RBOS_DB}</echo>
     </target>
 
@@ -87,7 +149,23 @@
         <mkdir dir="${classes.dir}"/>
     </target>
 
-    <target name="compile" depends="init">
+    <target name="-verify-glassfish-home">
+        <condition property="glassfish.jars.present">
+            <and>
+                <available file="${servlet.api.jar}"/>
+                <available file="${jakarta.mail.api.jar}"/>
+                <available file="${jakarta.activation.api.jar}"/>
+                <available file="${jakarta.websocket.api.jar}"/>
+                <available file="${jakarta.websocket.client.api.jar}"/>
+                <available file="${websocket.api.osgi.jar}"/>
+                <available file="${websocket.osgi.jar}"/>
+            </and>
+        </condition>
+        <fail unless="glassfish.jars.present"
+              message="GlassFish modules not found under ${glassfish.home}. Set GLASSFISH_HOME or -Dglassfish.home to a GlassFish 7 install containing jakarta servlet/mail/activation/websocket jars in glassfish/modules."/>
+    </target>
+
+    <target name="compile" depends="init,-verify-glassfish-home">
         <javac srcdir="${src.dir}/main/java"
                destdir="${classes.dir}"
                release="17"
@@ -101,12 +179,88 @@
         <echo message="Java classes compiled"/>
     </target>
 
+    <target name="compile-tests" depends="compile" description="Compile JUnit 4 tests">
+        <mkdir dir="${test.classes.dir}"/>
+        <mkdir dir="${test.reports.dir}"/>
+        <javac srcdir="${test.src.dir}"
+               destdir="${test.classes.dir}"
+               release="17"
+               classpathref="test.classpath"
+               includeantruntime="false"/>
+    </target>
+
+    <target name="test" depends="compile-tests" description="Run JUnit 4 suites with Ant junit">
+        <mkdir dir="${test.reports.dir}"/>
+        <junit fork="true" haltonfailure="true" printsummary="true">
+            <classpath>
+                <path refid="test.classpath"/>
+            </classpath>
+            <formatter type="plain" usefile="false"/>
+            <formatter type="xml"/>
+            <batchtest todir="${test.reports.dir}">
+                <fileset dir="${test.classes.dir}">
+                    <include name="**/*Test.class"/>
+                    <include name="**/*Tests.class"/>
+                </fileset>
+            </batchtest>
+        </junit>
+    </target>
+
+    <target name="-jacoco-setup">
+        <condition property="jacoco.present">
+            <available classpathref="jacoco.classpath" classname="org.jacoco.ant.ReportTask"/>
+        </condition>
+        <fail unless="jacoco.present" message="JaCoCo Ant task jars not found in ${lib.dir}. Please add jacocoant.jar before running coverage."/>
+        <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml" classpathref="jacoco.classpath"/>
+    </target>
+
+    <target name="coverage" depends="compile-tests,-jacoco-setup" description="Run JUnit 4 suites with JaCoCo agent coverage">
+        <mkdir dir="${jacoco.report.dir}"/>
+        <jacoco:coverage destfile="${jacoco.exec.file}">
+            <junit fork="true" haltonfailure="true" printsummary="true">
+                <classpath>
+                    <path refid="test.classpath"/>
+                </classpath>
+                <formatter type="plain" usefile="false"/>
+                <formatter type="xml"/>
+                <batchtest todir="${test.reports.dir}">
+                    <fileset dir="${test.classes.dir}">
+                        <include name="**/*Test.class"/>
+                        <include name="**/*Tests.class"/>
+                    </fileset>
+                </batchtest>
+            </junit>
+        </jacoco:coverage>
+        <jacoco:report>
+            <executiondata>
+                <file file="${jacoco.exec.file}"/>
+            </executiondata>
+            <structure name="${ant.project.name}">
+                <classfiles>
+                    <fileset dir="${classes.dir}"/>
+                </classfiles>
+                <sourcefiles encoding="UTF-8">
+                    <fileset dir="${src.dir}/main/java" includes="**/*.java"/>
+                </sourcefiles>
+            </structure>
+            <html destdir="${jacoco.report.dir}/html"/>
+            <xml destfile="${jacoco.report.dir}/jacoco.xml"/>
+            <csv destfile="${jacoco.report.dir}/jacoco.csv"/>
+        </jacoco:report>
+    </target>
+
     <target name="package-war" depends="-guard-db, bootstrap-db, compile">
         <war destfile="${war.file}" webxml="${webinf.dir}/web.xml">
             <fileset dir="${webcontent.dir}">
                 <include name="**/*"/>
+                <exclude name="WEB-INF/lib/**"/>
             </fileset>
-            <lib dir="${lib.dir}"/>
+            <zipfileset dir="${webinf.dir}/lib" prefix="WEB-INF/lib">
+                <include name="**/*.jar"/>
+            </zipfileset>
+            <zipfileset dir="${lib.dir}" prefix="WEB-INF/lib">
+                <include name="**/*.jar"/>
+            </zipfileset>
             <classes dir="${classes.dir}"/>
         </war>
         <echo message="WAR file created at: ${war.file}"/>

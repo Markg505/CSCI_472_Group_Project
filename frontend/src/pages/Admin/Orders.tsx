@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiClient, type Order } from '../../api/client';
+import { apiClient, type Order, type HistoryResult } from '../../api/client';
 import {
   LinkIcon,
   EyeIcon,
@@ -10,20 +10,47 @@ const statusOptions = ['cart', 'placed', 'paid', 'cancelled'] as const;
 
 export default function OrdersAdmin() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [historyMeta, setHistoryMeta] = useState<HistoryResult<Order> | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [newOrderForm, setNewOrderForm] = useState({
+    userId: '',
+    source: 'web',
+    status: 'placed',
+    itemId: '',
+    qty: 1,
+    price: 0
+  });
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [menuItems, setMenuItems] = useState<Array<{ itemId: string; name: string; price: number }>>([]);
 
   useEffect(() => {
     loadOrders();
   }, [statusFilter]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const items: any = await (apiClient as any).getMenuItems?.();
+        if (items && Array.isArray(items) && items.length) {
+          const mapped = items.map((m: any) => ({ itemId: m.itemId, name: m.name, price: m.price ?? 0 }));
+          setMenuItems(mapped);
+          setNewOrderForm(f => ({ ...f, itemId: mapped[0].itemId, price: mapped[0].price }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
   const loadOrders = async () => {
     try {
-      const data = statusFilter === 'all' 
-        ? await apiClient.getOrdersByStatus('all')
-        : await apiClient.getOrdersByStatus(statusFilter);
-      setOrders(data);
+      const data = await apiClient.getOrderHistory({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        pageSize: 50,
+      });
+      setOrders(data.items);
+      setHistoryMeta(data);
     } catch (error) {
       console.error('Error loading orders:', error);
     } finally {
@@ -84,19 +111,78 @@ export default function OrdersAdmin() {
           <h2 className="text-2xl/7 font-bold text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
             Order Management
           </h2>
-          <div className="mt-1 flex flex-col sm:mt-0 sm:flex-row sm:flex-wrap sm:space-x-6">
-            <div className="mt-2 flex items-center text-sm text-gray-500">
-              <CalendarIcon className="mr-1.5 size-5 shrink-0 text-gray-400" />
-              Total Orders: {orders.length}
-            </div>
-            <div className="mt-2 flex items-center text-sm text-gray-500">
-              <span className="mr-2 inline-block size-2 rounded-full bg-green-500" />
-              Revenue: ${totalRevenue.toFixed(2)}
+            <div className="mt-1 flex flex-col sm:mt-0 sm:flex-row sm:flex-wrap sm:space-x-6">
+              <div className="mt-2 flex items-center text-sm text-gray-500">
+                <CalendarIcon className="mr-1.5 size-5 shrink-0 text-gray-400" />
+                Total Orders: {orders.length}
+              </div>
+              <div className="mt-2 flex items-center text-sm text-gray-500">
+                <span className="mr-2 inline-block size-2 rounded-full bg-green-500" />
+                Revenue: ${totalRevenue.toFixed(2)}
+              </div>
+              {historyMeta && (
+                <div className="mt-2 text-sm text-gray-500">
+                  Retention: {historyMeta.retentionMonths} months (records start {historyMeta.retentionHorizon})
+                </div>
+              )}
             </div>
           </div>
-        </div>
         
         <div className="mt-5 flex lg:mt-0 lg:ml-4">
+          <button
+            type="button"
+            onClick={() => {
+              const cleaned = {
+                ...newOrderForm,
+                qty: Math.max(1, Number(newOrderForm.qty) || 1),
+                price: Math.max(0, Number(newOrderForm.price) || 0)
+              };
+              if (!cleaned.itemId) {
+                alert('Item ID required');
+                return;
+              }
+              apiClient.createOrder({
+                userId: cleaned.userId || undefined,
+                source: cleaned.source as any,
+                status: cleaned.status as any,
+                subtotal: cleaned.qty * cleaned.price,
+                tax: cleaned.qty * cleaned.price * 0.08,
+                total: cleaned.qty * cleaned.price * 1.08,
+                orderItems: [{
+                  itemId: cleaned.itemId,
+                  qty: cleaned.qty,
+                  unitPrice: cleaned.price,
+                  lineTotal: cleaned.qty * cleaned.price
+                }]
+              }).then(loadOrders).catch((e) => {
+                console.error(e);
+                alert('Failed to create order');
+              });
+            }}
+            className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500"
+          >
+            Quick Add Order
+          </button>
+          <select
+            value={newOrderForm.itemId}
+            onChange={(e) => {
+              const chosen = menuItems.find(mi => mi.itemId === e.target.value);
+              setNewOrderForm(prev => ({ ...prev, itemId: e.target.value, price: chosen?.price ?? prev.price }));
+            }}
+            className="ml-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+          >
+            {menuItems.map(mi => (
+              <option key={mi.itemId} value={mi.itemId}>{mi.name} (${mi.price.toFixed(2)})</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={1}
+            value={newOrderForm.qty}
+            onChange={(e) => setNewOrderForm(prev => ({ ...prev, qty: Number(e.target.value) }))}
+            className="ml-2 w-20 rounded-md border border-gray-300 px-2 py-2 text-sm"
+            aria-label="Quantity"
+          />
           {/* Status Filter */}
           <select
             value={statusFilter}

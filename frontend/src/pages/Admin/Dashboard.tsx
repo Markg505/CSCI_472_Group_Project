@@ -16,6 +16,7 @@ interface DashboardMetrics {
   todayOrders: number;
   todayRevenue: number;
   pendingReservations: number;
+  confirmedReservations: number;
   activeMenuItems: number;
   totalUsers: number;
 }
@@ -26,6 +27,7 @@ export default function Dashboard() {
     todayOrders: 0,
     todayRevenue: 0,
     pendingReservations: 0,
+    confirmedReservations: 0,
     activeMenuItems: 0,
     totalUsers: 0
   });
@@ -40,10 +42,11 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [reservations, menuItems, orders] = await Promise.all([
+      const [reservations, menuItems, orders, users] = await Promise.all([
         apiClient.getReservations(),
         apiClient.getActiveMenuItems(),
         apiClient.getOrdersByStatus('all'), // Get all orders
+        (apiClient as any).listUsers ? (apiClient as any).listUsers() : Promise.resolve([])
       ]);
 
       const today = new Date().toISOString().split('T')[0];
@@ -53,14 +56,17 @@ export default function Dashboard() {
       const todayOrders = orders.filter((o: any) => 
         o.createdUtc?.startsWith(today) && o.status !== 'cancelled'
       );
+      const pendingCount = reservations.filter((r: any) => r.status === 'pending').length;
+      const confirmedCount = reservations.filter((r: any) => r.status === 'confirmed').length;
 
       setMetrics({
         todayReservations: todayReservations.length,
         todayOrders: todayOrders.length,
         todayRevenue: todayOrders.reduce((sum: number, order: any) => sum + order.total, 0),
-        pendingReservations: reservations.filter((r: any) => r.status === 'pending').length,
+        pendingReservations: pendingCount,
+        confirmedReservations: confirmedCount,
         activeMenuItems: menuItems.length,
-        totalUsers: 0 // We don't have getUsers method
+        totalUsers: Array.isArray(users) ? users.length : 0
       });
 
       // Recent activity (last 5 events)
@@ -137,8 +143,9 @@ export default function Dashboard() {
           color="purple"
         />
         <RealTimeStatCard
-          title="Pending Reservations"
-          value={metrics.pendingReservations.toString()}
+          title="Active Reservations"
+          value={`${metrics.pendingReservations + metrics.confirmedReservations}`}
+          subText={`${metrics.pendingReservations} pending / ${metrics.confirmedReservations} confirmed`}
           icon={<UserGroupIcon className="size-6 text-orange-600" />}
           color="orange"
         />
@@ -217,12 +224,13 @@ export default function Dashboard() {
 interface RealTimeStatCardProps {
   title: string;
   value: string;
+  subText?: string;
   change?: 'up' | 'down';
   icon: React.ReactNode;
   color: 'blue' | 'green' | 'purple' | 'orange' | 'indigo' | 'cyan';
 }
 
-function RealTimeStatCard({ title, value, change, icon, color }: RealTimeStatCardProps) {
+function RealTimeStatCard({ title, value, subText, change, icon, color }: RealTimeStatCardProps) {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
@@ -238,6 +246,7 @@ function RealTimeStatCard({ title, value, change, icon, color }: RealTimeStatCar
         <div>
           <div className="text-sm font-medium text-slate-600">{title}</div>
           <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
+          {subText && <div className="text-xs text-slate-500 mt-0.5">{subText}</div>}
         </div>
         <div className={`rounded-lg p-2 ${colorClasses[color]}`}>
           {icon}
