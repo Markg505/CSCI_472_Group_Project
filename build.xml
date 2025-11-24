@@ -12,7 +12,7 @@
 
     <property name="java17.home" value="../../Program Files/Java/jdk-17"/>
 
-    <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+    <property name="glassfish.home" value="../glassfish7"/>
     <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
     <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
     <property name="jakarta.activation.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.activation-api.jar"/>

@@ -19,13 +19,20 @@ export default defineConfig({
     port: 5173,
     cors: true,
     proxy: {
-      '/api': {
-        target: 'http://MSI:8080',
+      '/RBOS/api': {
+        target: 'http://localhost:8080',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        rewrite: (path) => path // Keep the /RBOS prefix
+      },
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => `/RBOS${path}`
       },
       '/RBOS/realtime': {
-        target: 'ws://MSI:8080',
+        target: 'ws://localhost:8080',
         ws: true,
         changeOrigin: true,
         secure: false

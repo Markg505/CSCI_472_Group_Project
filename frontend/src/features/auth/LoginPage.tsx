@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth, AUTH_DEBUG_TAG } from "./useAuth"; 
+import { useAuth, AUTH_DEBUG_TAG } from "./useAuth";
+import type { User } from "../../api/client";
 
 type FormData = { email: string; password: string };
 
@@ -29,19 +30,22 @@ export default function LoginPage() {
         try {
           const j = await res.json();
           if (j?.message) msg = j.message;
-        } catch {}
+        } catch {
+          // Ignore JSON parse errors, use default message
+        }
         throw new Error(msg);
       }
 
-      
-      let me: any = null;
+      let me: User | null = null;
       try {
         const meRes = await fetch("/RBOS/api/auth/me", { credentials: "include" });
         if (meRes.ok) me = await meRes.json();
-      } catch {}
+      } catch {
+        // Ignore /me fetch errors - will be handled by null check below
+      }
 
       if (me) {
-        try { localStorage.setItem("rbos_user", JSON.stringify(me)); } catch {}
+        try { localStorage.setItem("rbos_user", JSON.stringify(me)); } catch { /* Ignore localStorage errors */ }
         console.log("Login OK, /me =", me); setUser(me); console.log("LoginPage setUser done");
       } else {
 
@@ -49,8 +53,9 @@ export default function LoginPage() {
       }
 
       navigate("/");
-    } catch (e: any) {
-      alert(e?.message ?? "Login failed");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Login failed";
+      alert(message);
     }
   };
 
@@ -86,12 +91,18 @@ export default function LoginPage() {
 
         <div className="mt-6 space-y-2 text-center text-sm text-mute">
           <div>
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <Link to="/register" className="text-gold hover:underline">Register</Link>
           </div>
           <div>
-            <Link to="/reset-password" className="text-gold hover:underline">Reset password</Link>
+            <Link to="/admin-login" className="text-gold hover:underline">Staff/Admin Login</Link>
           </div>
+        </div>
+
+        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-400">
+          <p className="font-semibold mb-1">Test Customer Credentials:</p>
+          <p>Email: marcus@example.com</p>
+          <p>Password: customer123</p>
         </div>
       </div>
     </section>

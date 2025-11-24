@@ -1,9 +1,11 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import App from "../App";
 import HomePage from "../pages/HomePage";
 import ReservationsPage from "../pages/ReservationsPage";
 import RegisterPage from "../pages/Register";
 import LoginPage from "../features/auth/LoginPage";
+import AdminLoginPage from "../pages/AdminLogin";
+import CustomerDashboard from "../pages/CustomerDashboard";
 import CustomerMenu from "../pages/CustomerMenu";
 import CartPage from '../pages/CartPage';
 import Orders from '../pages/Admin/Orders';
@@ -28,7 +30,9 @@ export const router = createBrowserRouter(
         { index: true, element: <HomePage /> },
         { path: "reservations", element: <ReservationsPage /> },
         { path: "login", element: <LoginPage /> },
+        { path: "admin-login", element: <AdminLoginPage /> },
         { path: "register", element: <RegisterPage /> },
+        { path: "dashboard", element: <CustomerDashboard /> },
         { path: "menu", element: <CustomerMenu /> },
         { path: "cart", element: <CartPage /> },
         // Admin routes
