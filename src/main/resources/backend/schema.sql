@@ -35,6 +35,7 @@ CREATE TABLE dining_tables (
 CREATE TABLE reservations (
   reservation_id TEXT PRIMARY KEY,
   user_id        TEXT,
+  guest_name     TEXT,
   table_id       TEXT NOT NULL,
   start_utc      TEXT NOT NULL,
   end_utc        TEXT NOT NULL,
@@ -93,7 +94,8 @@ CREATE TABLE inventory (
 -- orders
 CREATE TABLE orders (
   order_id    TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL,
+  user_id     TEXT,
+  cart_token  TEXT UNIQUE,
   source      TEXT NOT NULL CHECK (source IN ('web','phone','walkin')) DEFAULT 'web',
   status      TEXT NOT NULL CHECK (status IN ('cart','placed','paid','cancelled')) DEFAULT 'cart',
   subtotal    REAL NOT NULL DEFAULT 0.0,
@@ -104,6 +106,7 @@ CREATE TABLE orders (
 );
 
 CREATE INDEX idx_orders_by_user ON orders(user_id, created_utc);
+CREATE INDEX idx_orders_by_cart_token ON orders(cart_token);
 
 -- order items
 CREATE TABLE order_items (
@@ -196,11 +199,11 @@ VALUES
 
 -- ORDERS (8)
 INSERT INTO orders
-  (order_id, user_id, source, status, subtotal, tax, total, created_utc)
+  (order_id, user_id, cart_token, source, status, subtotal, tax, total, created_utc)
 VALUES
-  ('1', '4', 'web',    'paid',     25.00,  2.06, 27.06, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')),
-  ('2', '5', 'walkin', 'paid',     32.45,  2.68, 35.13, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')),
-  ('3', '6', 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'));
+  ('1', '4', NULL, 'web',    'paid',     25.00,  2.06, 27.06, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')),
+  ('2', '5', NULL, 'walkin', 'paid',     32.45,  2.68, 35.13, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')),
+  ('3', '6', NULL, 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'));
 
 -- ORDER ITEMS (16)
 INSERT INTO order_items (order_item_id, order_id, item_id, qty, unit_price, line_total, notes) VALUES

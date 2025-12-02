@@ -2,6 +2,7 @@ package com.RBOS.dao;
 
 import com.RBOS.models.Order;
 import com.RBOS.models.OrderItem;
+import com.RBOS.models.PagedResult;
 import com.RBOS.utils.DatabaseConnection;
 import jakarta.servlet.ServletContext;
 import java.sql.*;
@@ -34,6 +35,7 @@ public class OrderDAO {
                 Order order = new Order(
                     rs.getString("order_id"),
                     rs.getString("user_id"),
+                    rs.getString("cart_token"),
                     rs.getString("source"),
                     rs.getString("status"),
                     rs.getDouble("subtotal"),
@@ -66,6 +68,7 @@ public class OrderDAO {
                 Order order = new Order(
                     rs.getString("order_id"),
                     rs.getString("user_id"),
+                    rs.getString("cart_token"),
                     rs.getString("source"),
                     rs.getString("status"),
                     rs.getDouble("subtotal"),
@@ -96,6 +99,7 @@ public class OrderDAO {
                 Order order = new Order(
                     rs.getString("order_id"),
                     rs.getString("user_id"),
+                    rs.getString("cart_token"),
                     rs.getString("source"),
                     rs.getString("status"),
                     rs.getDouble("subtotal"),
@@ -108,6 +112,77 @@ public class OrderDAO {
             }
         }
         return orders;
+    }
+
+    public PagedResult<Order> getOrdersWithFilters(String status, String startUtc, String endUtc,
+                                                  String userId, int page, int pageSize) throws SQLException {
+        List<Order> orders = new ArrayList<>();
+        List<String> params = new ArrayList<>();
+        int total = 0;
+
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        if (status != null && !status.isEmpty() && !"all".equalsIgnoreCase(status)) {
+            where.append(" AND o.status = ?");
+            params.add(status);
+        }
+        if (startUtc != null && !startUtc.isEmpty()) {
+            where.append(" AND o.created_utc >= ?");
+            params.add(startUtc);
+        }
+        if (endUtc != null && !endUtc.isEmpty()) {
+            where.append(" AND o.created_utc <= ?");
+            params.add(endUtc);
+        }
+        if (userId != null && !userId.isEmpty()) {
+            where.append(" AND o.user_id = ?");
+            params.add(userId);
+        }
+
+        String countSql = "SELECT COUNT(*) FROM orders o" + where;
+        String dataSql = "SELECT o.*, u.full_name, u.email " +
+                "FROM orders o " +
+                "LEFT JOIN users u ON o.user_id = u.user_id " +
+                where +
+                " ORDER BY o.created_utc DESC LIMIT ? OFFSET ?";
+
+        try (Connection conn = DatabaseConnection.getConnection(context)) {
+            try (PreparedStatement countStmt = conn.prepareStatement(countSql)) {
+                for (int i = 0; i < params.size(); i++) {
+                    countStmt.setString(i + 1, params.get(i));
+                }
+                try (ResultSet rs = countStmt.executeQuery()) {
+                    if (rs.next()) {
+                        total = rs.getInt(1);
+                    }
+                }
+            }
+            try (PreparedStatement dataStmt = conn.prepareStatement(dataSql)) {
+                for (int i = 0; i < params.size(); i++) {
+                    dataStmt.setString(i + 1, params.get(i));
+                }
+                dataStmt.setInt(params.size() + 1, pageSize);
+                dataStmt.setInt(params.size() + 2, (page - 1) * pageSize);
+
+                try (ResultSet dataRs = dataStmt.executeQuery()) {
+                    while (dataRs.next()) {
+                        Order order = new Order(
+                                dataRs.getString("order_id"),
+                                dataRs.getString("user_id"),
+                                dataRs.getString("cart_token"),
+                                dataRs.getString("source"),
+                                dataRs.getString("status"),
+                                dataRs.getDouble("subtotal"),
+                                dataRs.getDouble("tax"),
+                                dataRs.getDouble("total"),
+                                dataRs.getString("created_utc")
+                        );
+                        order.setOrderItems(orderItemDAO.getOrderItemsByOrderId(order.getOrderId()));
+                        orders.add(order);
+                    }
+                }
+            }
+        }
+        return new PagedResult<>(orders, total);
     }
 
     public List<Order> getOrdersByDateRange(String startDate, String endDate) throws SQLException {
@@ -128,6 +203,7 @@ public class OrderDAO {
                 Order order = new Order(
                         rs.getString("order_id"),
                         rs.getString("user_id"),
+                        rs.getString("cart_token"),
                         rs.getString("source"),
                         rs.getString("status"),
                         rs.getDouble("subtotal"),
@@ -202,6 +278,7 @@ public class OrderDAO {
                     Order order = new Order(
                             rs.getString("order_id"),
                             rs.getString("user_id"),
+                            rs.getString("cart_token"),
                             rs.getString("source"),
                             rs.getString("status"),
                             rs.getDouble("subtotal"),
@@ -219,73 +296,78 @@ public class OrderDAO {
     }
     
     public String createOrder(Order order) throws SQLException {
-        String sql = "INSERT INTO orders (user_id, source, status, subtotal, tax, total) VALUES (?, ?, ?, ?, ?, ?)";
-        
-        Connection conn = null;
-        try {
-            conn = DatabaseConnection.getConnection(context);
-            conn.setAutoCommit(false); // Start transaction
-            
-            try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                
-                pstmt.setString(1, order.getOrderId());
+        try (Connection conn = DatabaseConnection.getConnection(context)) {
+            boolean shouldRestoreAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+
+            try {
+                String orderId = createOrder(order, conn);
+                conn.commit();
+                return orderId;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(shouldRestoreAutoCommit);
+            }
+        }
+    }
+
+    public String createOrder(Order order, Connection conn) throws SQLException {
+        String orderId = order.getOrderId();
+        if (orderId == null || orderId.isBlank()) {
+            orderId = java.util.UUID.randomUUID().toString();
+            order.setOrderId(orderId);
+        }
+        String sql = "INSERT INTO orders (order_id, user_id, cart_token, source, status, subtotal, tax, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, orderId);
+            if (order.getUserId() == null || order.getUserId().isBlank()) {
+                pstmt.setNull(2, java.sql.Types.VARCHAR);
+            } else {
                 pstmt.setString(2, order.getUserId());
-                pstmt.setString(3, order.getSource() != null ? order.getSource() : "web");
-                pstmt.setString(4, order.getStatus() != null ? order.getStatus() : "cart");
-                pstmt.setDouble(5, order.getSubtotal() != null ? order.getSubtotal() : 0.0);
-                pstmt.setDouble(6, order.getTax() != null ? order.getTax() : 0.0);
-                pstmt.setDouble(7, order.getTotal() != null ? order.getTotal() : 0.0);
-                
-                int affectedRows = pstmt.executeUpdate();
-                
-                if (affectedRows > 0) {
-                    try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                        if (generatedKeys.next()) {
-                            String orderId = generatedKeys.getString(1);
-                            
-                            // Create order items if provided
-                            if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
-                                for (OrderItem item : order.getOrderItems()) {
-                                    item.setOrderId(orderId);
-                                    orderItemDAO.createOrderItem(item, conn);
-                                }
-                            }
-                            
-                            conn.commit();
-                            return orderId;
-                        }
+            }
+            pstmt.setString(3, order.getCartToken());
+            pstmt.setString(4, order.getSource() != null ? order.getSource() : "web");
+            pstmt.setString(5, order.getStatus() != null ? order.getStatus() : "cart");
+            pstmt.setDouble(6, order.getSubtotal() != null ? order.getSubtotal() : 0.0);
+            pstmt.setDouble(7, order.getTax() != null ? order.getTax() : 0.0);
+            pstmt.setDouble(8, order.getTotal() != null ? order.getTotal() : 0.0);
+
+            int affectedRows = pstmt.executeUpdate();
+
+            if (affectedRows > 0) {
+                // Create order items if provided
+                if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+                    for (OrderItem item : order.getOrderItems()) {
+                        item.setOrderId(orderId);
+                        orderItemDAO.createOrderItem(item, conn);
                     }
                 }
-                conn.rollback();
-            }
-        } catch (SQLException e) {
-            if (conn != null) {
-                conn.rollback();
-            }
-            throw e;
-        } finally {
-            if (conn != null) {
-                conn.setAutoCommit(true);
-                conn.close();
+
+                return orderId;
             }
         }
         return null;
     }
     
     public boolean updateOrder(Order order) throws SQLException {
-        String sql = "UPDATE orders SET user_id = ?, source = ?, status = ?, subtotal = ?, tax = ?, total = ? WHERE order_id = ?";
-        
+        String sql = "UPDATE orders SET order_id = ?, user_id = ?, cart_token = ?, source = ?, status = ?, subtotal = ?, tax = ?, total = ? WHERE order_id = ?";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, order.getOrderId());
             pstmt.setString(2, order.getUserId());
-            pstmt.setString(3, order.getSource());
-            pstmt.setString(4, order.getStatus());
-            pstmt.setDouble(5, order.getSubtotal());
-            pstmt.setDouble(6, order.getTax());
-            pstmt.setDouble(7, order.getTotal());
-            pstmt.setString(8, order.getOrderId());
+            pstmt.setString(3, order.getCartToken());
+            pstmt.setString(4, order.getSource());
+            pstmt.setString(5, order.getStatus());
+            pstmt.setDouble(6, order.getSubtotal());
+            pstmt.setDouble(7, order.getTax());
+            pstmt.setDouble(8, order.getTotal());
+            pstmt.setString(9, order.getOrderId());
             
             return pstmt.executeUpdate() > 0;
         }
@@ -305,16 +387,126 @@ public class OrderDAO {
     }
     
     public boolean updateOrderTotals(String orderId, double subtotal, double tax, double total) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection(context)) {
+            return updateOrderTotals(orderId, subtotal, tax, total, conn);
+        }
+    }
+
+    public boolean updateOrderTotals(String orderId, double subtotal, double tax, double total, Connection conn) throws SQLException {
         String sql = "UPDATE orders SET subtotal = ?, tax = ?, total = ? WHERE order_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setDouble(1, subtotal);
             pstmt.setDouble(2, tax);
             pstmt.setDouble(3, total);
             pstmt.setString(4, orderId);
-            
+
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public Order getCartByUserId(String userId) throws SQLException {
+        if (userId == null) {
+            return null;
+        }
+        String sql = "SELECT * FROM orders WHERE user_id = ? AND status = 'cart' ORDER BY created_utc DESC LIMIT 1";
+
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Order(
+                        rs.getString("order_id"),
+                        rs.getString("user_id"),
+                        rs.getString("cart_token"),
+                        rs.getString("source"),
+                        rs.getString("status"),
+                        rs.getDouble("subtotal"),
+                        rs.getDouble("tax"),
+                        rs.getDouble("total"),
+                        rs.getString("created_utc")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    public Order getCartByUserId(String userId, Connection conn) throws SQLException {
+        if (userId == null) {
+            return null;
+        }
+        String sql = "SELECT * FROM orders WHERE user_id = ? AND status = 'cart' ORDER BY created_utc DESC LIMIT 1";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapOrder(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    public Order getCartByToken(String cartToken) throws SQLException {
+        String sql = "SELECT * FROM orders WHERE cart_token = ? AND status = 'cart' ORDER BY created_utc DESC LIMIT 1";
+
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, cartToken);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapOrder(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    public Order getCartByToken(String cartToken, Connection conn) throws SQLException {
+        String sql = "SELECT * FROM orders WHERE cart_token = ? AND status = 'cart' ORDER BY created_utc DESC LIMIT 1";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, cartToken);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapOrder(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    public boolean updateCartOwnership(String orderId, String userId, String cartToken, Connection conn) throws SQLException {
+        String sql = "UPDATE orders SET user_id = ?, cart_token = ? WHERE order_id = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, userId);
+            pstmt.setString(2, cartToken);
+            pstmt.setString(3, orderId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean updateCartToken(String orderId, String cartToken, Connection conn) throws SQLException {
+        String sql = "UPDATE orders SET cart_token = ? WHERE order_id = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, cartToken);
+            pstmt.setString(2, orderId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean deleteOrder(String orderId, Connection conn) throws SQLException {
+        String sql = "DELETE FROM orders WHERE order_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, orderId);
             return pstmt.executeUpdate() > 0;
         }
     }
@@ -345,8 +537,22 @@ public class OrderDAO {
             pstmt.setString(2, orderId);
             pstmt.setString(3, orderId);
             pstmt.setString(4, orderId);
-            
+
             pstmt.executeUpdate();
         }
+    }
+
+    private Order mapOrder(ResultSet rs) throws SQLException {
+        return new Order(
+                rs.getString("order_id"),
+                rs.getString("user_id"),
+                rs.getString("cart_token"),
+                rs.getString("source"),
+                rs.getString("status"),
+                rs.getDouble("subtotal"),
+                rs.getDouble("tax"),
+                rs.getDouble("total"),
+                rs.getString("created_utc")
+        );
     }
 }

@@ -1,6 +1,7 @@
 package com.RBOS.servlets;
 
 import com.RBOS.dao.MenuItemDAO;
+import com.RBOS.dao.InventoryDAO;
 import com.RBOS.models.MenuItem;
 import com.RBOS.models.MenuItemWithInventory;
 import com.RBOS.utils.DatabaseConnection;
@@ -90,11 +91,15 @@ public class MenuServlet extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         
         try {
-            MenuItem menuItem = objectMapper.readValue(request.getReader(), MenuItem.class);
+            JsonNode root = objectMapper.readTree(request.getReader());
+            MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
             String itemId = menuItemDAO.createMenuItem(menuItem);
             
             if (itemId != null) {
                 menuItem.setItemId(itemId);
+
+                linkInventory(root, itemId);
+
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(menuItem));
             } else {
@@ -154,12 +159,14 @@ public class MenuServlet extends HttpServlet {
             }
 
             String itemId = splits[1];
-            MenuItem menuItem = objectMapper.readValue(request.getReader(), MenuItem.class);
+            JsonNode root = objectMapper.readTree(request.getReader());
+            MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
             menuItem.setItemId(itemId); // Ensure the ID matches the path
 
             boolean success = menuItemDAO.updateMenuItem(menuItem);
 
             if (success) {
+                linkInventory(root, itemId);
                 response.getWriter().write(objectMapper.writeValueAsString(menuItem));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -209,6 +216,22 @@ public class MenuServlet extends HttpServlet {
             pstmt.setString(2, itemId);
 
             return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    private void linkInventory(JsonNode root, String itemId) {
+        try {
+            String inventoryId = root.hasNonNull("inventoryId") ? root.get("inventoryId").asText() : null;
+            String inventorySku = root.hasNonNull("inventorySku") ? root.get("inventorySku").asText() : null;
+            InventoryDAO inventoryDAO = new InventoryDAO(getServletContext());
+            if (inventoryId != null && !inventoryId.isBlank()) {
+                inventoryDAO.linkInventoryById(inventoryId, itemId);
+            } else if (inventorySku != null && !inventorySku.isBlank()) {
+                inventoryDAO.linkInventoryBySku(inventorySku, itemId);
+            }
+        } catch (Exception e) {
+            // swallow linking errors to avoid failing menu updates
+            System.err.println("Inventory link skipped: " + e.getMessage());
         }
     }
 }

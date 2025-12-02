@@ -2,11 +2,14 @@ package com.RBOS.servlets;
 
 import com.RBOS.dao.ReservationDAO;
 import com.RBOS.dao.DiningTableDAO;
+import com.RBOS.models.PagedResult;
 import com.RBOS.models.Reservation;
 import com.RBOS.services.EmailService;
 import com.RBOS.dao.UserDAO;
 import com.RBOS.models.User;
 import com.RBOS.models.DiningTable;
+import com.RBOS.models.HistoryResponse;
+import com.RBOS.utils.HistoryValidation;
 import com.RBOS.websocket.WebSocketConfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,9 +21,12 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
+import java.time.LocalDate;
 
 @WebServlet("/api/reservations/*")
 public class ReservationServlet extends HttpServlet {
+    private static final int RETENTION_MONTHS = 13;
     private ReservationDAO reservationDAO;
     private DiningTableDAO diningTableDAO;
     private ObjectMapper objectMapper;
@@ -46,6 +52,8 @@ public class ReservationServlet extends HttpServlet {
                 // Get all reservations
                 List<Reservation> reservations = reservationDAO.getAllReservations();
                 response.getWriter().write(objectMapper.writeValueAsString(reservations));
+            } else if ("/history".equals(pathInfo)) {
+                handleHistory(request, response);
             } else if (pathInfo.startsWith("/available-tables")) {
                 // Get available tables for a time period
                 String startUtc = request.getParameter("startUtc");
@@ -96,6 +104,32 @@ public class ReservationServlet extends HttpServlet {
 
         try {
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
+            if (reservation.getTableId() == null || reservation.getTableId().isBlank()) {
+                List<DiningTable> tables = diningTableDAO.getAllTables();
+                if (tables.isEmpty()) {
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST, "No dining tables configured");
+                    return;
+                }
+                reservation.setTableId(tables.get(0).getTableId());
+            }
+            // drop unknown users to avoid FK failures
+            if (reservation.getUserId() != null && !reservation.getUserId().isBlank()) {
+                try {
+                    UserDAO userDAO = new UserDAO(getServletContext());
+                    User existing = userDAO.getUserById(reservation.getUserId());
+                    if (existing == null) {
+                        reservation.setUserId(null);
+                    } else if (reservation.getGuestName() == null || reservation.getGuestName().isBlank()) {
+                        reservation.setGuestName(existing.getFullName());
+                    }
+                } catch (Exception ignored) {}
+            }
+            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank()) && reservation.getUserId() == null) {
+                reservation.setGuestName("Guest");
+            }
+            if (reservation.getReservationId() == null || reservation.getReservationId().isBlank()) {
+                reservation.setReservationId(java.util.UUID.randomUUID().toString());
+            }
             String reservationId = reservationDAO.createReservation(reservation);
 
             if (reservationId != null) {
@@ -160,6 +194,98 @@ public class ReservationServlet extends HttpServlet {
         }
     }
 
+    private void handleHistory(HttpServletRequest request, HttpServletResponse response) throws IOException, SQLException {
+        int page = HistoryValidation.normalizePage(parseInteger(request.getParameter("page")));
+        int pageSize = HistoryValidation.clampPageSize(parseInteger(request.getParameter("pageSize")));
+
+        String rawStatus = request.getParameter("status");
+        String rawStart = request.getParameter("start_utc");
+        String rawEnd = request.getParameter("end_utc");
+
+        String status;
+        Instant startInstant;
+        Instant endInstant;
+        try {
+            status = HistoryValidation.normalizeStatus(rawStatus, HistoryValidation.ALLOWED_RESERVATION_STATUSES);
+            startInstant = HistoryValidation.parseIsoInstant(rawStart, "start_utc");
+            endInstant = HistoryValidation.parseIsoInstant(rawEnd, "end_utc");
+        } catch (IllegalArgumentException ex) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
+            return;
+        }
+
+        if (startInstant != null && endInstant != null && startInstant.isAfter(endInstant)) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "start_utc must be before or equal to end_utc");
+            return;
+        }
+
+        Instant now = Instant.now();
+        Instant retentionHorizon = HistoryValidation.retentionHorizon(now, RETENTION_MONTHS);
+        Instant clampedStart = HistoryValidation.clampStart(startInstant, retentionHorizon);
+        Instant clampedEnd = HistoryValidation.clampEnd(endInstant, retentionHorizon, now);
+
+        if (clampedStart.isAfter(clampedEnd)) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Requested range is outside the retention window");
+            return;
+        }
+
+        String startUtc = HistoryValidation.formatInstant(clampedStart);
+        String endUtc = HistoryValidation.formatInstant(clampedEnd);
+
+        String sessionUserId = getSessionUserId(request);
+        String sessionRole = getSessionRole(request);
+        String requestedUserId = request.getParameter("userId");
+
+        String scopedUserId;
+        try {
+            scopedUserId = HistoryValidation.resolveScopedUserId(sessionRole, sessionUserId, requestedUserId);
+        } catch (SecurityException ex) {
+            if (sessionUserId == null) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
+            } else {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, ex.getMessage());
+            }
+            return;
+        }
+
+        PagedResult<Reservation> paged = reservationDAO.getReservationsWithFilters(status, startUtc, endUtc, scopedUserId, page, pageSize);
+        HistoryResponse<Reservation> history = new HistoryResponse<>(
+                paged.getItems(),
+                page,
+                pageSize,
+                paged.getTotal(),
+                RETENTION_MONTHS,
+                LocalDate.now().minusMonths(RETENTION_MONTHS).toString()
+        );
+        response.getWriter().write(objectMapper.writeValueAsString(history));
+    }
+
+    private String getSessionUserId(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        Object attr = session.getAttribute("userId");
+        return attr != null ? attr.toString() : null;
+    }
+
+    private String getSessionRole(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        Object attr = session.getAttribute("role");
+        return attr != null ? attr.toString() : null;
+    }
+
+    private Integer parseInteger(String value) {
+        try {
+            return value != null ? Integer.parseInt(value) : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -203,6 +329,20 @@ public class ReservationServlet extends HttpServlet {
             }
 
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
+            if (reservation.getUserId() != null && !reservation.getUserId().isBlank()) {
+                try {
+                    UserDAO userDAO = new UserDAO(getServletContext());
+                    User existing = userDAO.getUserById(reservation.getUserId());
+                    if (existing == null) {
+                        reservation.setUserId(null);
+                    } else if (reservation.getGuestName() == null || reservation.getGuestName().isBlank()) {
+                        reservation.setGuestName(existing.getFullName());
+                    }
+                } catch (Exception ignored) {}
+            }
+            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank()) && reservation.getUserId() == null) {
+                reservation.setGuestName("Guest");
+            }
             boolean success = reservationDAO.updateReservation(reservation);
 
             if (success) {

@@ -83,7 +83,8 @@ public class UserDAO {
     }
 
     public String createUser(User user) throws SQLException {
-        String sql = "INSERT INTO users (role, full_name, email, phone, password_hash) VALUES (?, ?, ?, ?, ?)";
+        String userId = java.util.UUID.randomUUID().toString();
+        String sql = "INSERT INTO users (user_id, role, full_name, email, phone, password_hash) VALUES (?, ?, ?, ?, ?, ?)";
 
         String hash = user.getPasswordHash();
         if ((hash == null || hash.isBlank()) && user.getPassword() != null && !user.getPassword().isBlank()) {
@@ -91,26 +92,23 @@ public class UserDAO {
         }
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setString(1, user.getRole() != null ? user.getRole() : "customer");
-            pstmt.setString(2, user.getFullName());
-            pstmt.setString(3, user.getEmail());
-            pstmt.setString(4, user.getPhone());
+            pstmt.setString(1, userId);
+            pstmt.setString(2, user.getRole() != null ? user.getRole() : "customer");
+            pstmt.setString(3, user.getFullName());
+            pstmt.setString(4, user.getEmail());
+            pstmt.setString(5, user.getPhone());
             if (hash == null || hash.isBlank()) {
-                pstmt.setNull(5, Types.VARCHAR);
+                pstmt.setNull(6, Types.VARCHAR);
             } else {
-                pstmt.setString(5, hash);
+                pstmt.setString(6, hash);
             }
 
             int affectedRows = pstmt.executeUpdate();
 
             if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getString(1);
-                    }
-                }
+                return userId;
             }
         }
         return null;
@@ -127,6 +125,21 @@ public class UserDAO {
             pstmt.setString(3, user.getEmail());
             pstmt.setString(4, user.getPhone());
             pstmt.setString(5, user.getUserId());
+
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean updateProfile(String userId, String fullName, String email, String phone) throws SQLException {
+        String sql = "UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection(context);
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, fullName);
+            pstmt.setString(2, email);
+            pstmt.setString(3, phone);
+            pstmt.setString(4, userId);
 
             return pstmt.executeUpdate() > 0;
         }
@@ -160,6 +173,21 @@ public class UserDAO {
         }
     }
 
+    public boolean updatePasswordWithValidation(String userId, String currentPassword, String newPassword)
+            throws SQLException {
+        User user = getUserById(userId);
+        if (user == null)
+            return false;
+
+        String stored = user.getPasswordHash();
+        if (stored != null && !stored.isBlank()) {
+            if (!passwordMatches(currentPassword, stored))
+                return false;
+        }
+
+        return setPassword(userId, newPassword);
+    }
+
     private String hashPassword(String raw) {
         if (raw == null)
             return null;
@@ -172,5 +200,19 @@ public class UserDAO {
         } catch (Throwable t) {
             return raw;
         }
+    }
+
+    public static boolean passwordMatches(String raw, String stored) {
+        if (stored == null)
+            return false;
+        try {
+            Class<?> bc = Class.forName("org.mindrot.jbcrypt.BCrypt");
+            var checkpw = bc.getMethod("checkpw", String.class, String.class);
+            Object ok = checkpw.invoke(null, raw, stored);
+            if (ok instanceof Boolean && (Boolean) ok)
+                return true;
+        } catch (Throwable ignored) {
+        }
+        return stored.equals(raw);
     }
 }

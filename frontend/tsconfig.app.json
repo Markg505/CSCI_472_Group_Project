@@ -6,7 +6,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "noImplicitAny": false,
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest", "vitest/globals", "@testing-library/jest-dom"],
     "skipLibCheck": true,
 
     /* Bundler mode */

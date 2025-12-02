@@ -131,8 +131,14 @@ public class MenuItemDAO {
     }
 
     public String createMenuItem(MenuItem menuItem) throws SQLException {
-        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String itemId = menuItem.getItemId();
+        if (itemId == null || itemId.isBlank()) {
+            itemId = java.util.UUID.randomUUID().toString();
+            menuItem.setItemId(itemId);
+        }
+
+        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags, item_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -144,15 +150,12 @@ public class MenuItemDAO {
             pstmt.setBoolean(5, menuItem.getActive());
             pstmt.setString(6, menuItem.getImageUrl());
             pstmt.setString(7, menuItem.getDietaryTags());
+            pstmt.setString(8, itemId);
 
             int affectedRows = pstmt.executeUpdate();
 
             if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getString(1);
-                    }
-                }
+                return itemId;
             }
         }
         return null;
