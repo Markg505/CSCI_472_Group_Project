@@ -6,7 +6,7 @@ export type Allergen =
   | "peanuts" | "tree-nuts" | "shellfish" | "fish" | "sesame";
 
 export type UserRow = { id: string; name: string; email: string; role: Role };
-export type MenuItem = { itemId: string; name: string; price: number; category: string; active: boolean, imageUrl: string, dietaryTags: string, description: string};
+export type MenuItem = { itemId: string; name: string; price: number; category: string; active: boolean, imageUrl: string, dietaryTags: string, description: string, outOfStock?: boolean};
 export type TableRow = { id: string; number: number; capacity: number; notes?: string };
 export type InventoryItem = {
   id: string;

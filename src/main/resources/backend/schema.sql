@@ -59,7 +59,8 @@ CREATE TABLE menu_items (
   price          REAL NOT NULL CHECK (price >= 0),
   active         INTEGER NOT NULL DEFAULT 1,
   image_url      TEXT,
-  dietary_tags   TEXT
+  dietary_tags   TEXT,
+  out_of_stock   INTEGER NOT NULL DEFAULT 0
 );
 
 -- inventory

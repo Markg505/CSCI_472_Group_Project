@@ -146,11 +146,14 @@ export default function CartPage() {
         )}
 
         <div className="mt-8 space-y-4">
-          {state.items.map(item => (
-            <div key={item.itemId} className="flex items-center justify-between p-4 border border-white/10 rounded-xl">
+          {state.items.map((item, idx) => (
+            <div key={`${item.itemId}-${idx}`} className="flex items-center justify-between p-4 border border-white/10 rounded-xl">
               <div className="flex-1">
                 <h3 className="font-medium">{item.name}</h3>
                 <p className="text-sm text-mute">${item.price.toFixed(2)} each</p>
+                {item.notes && (
+                  <p className="text-sm text-amber-400 mt-1 italic">Note: {item.notes}</p>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
