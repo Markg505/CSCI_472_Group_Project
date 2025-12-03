@@ -17,7 +17,7 @@ public class MenuItemDAO {
 
     public List<MenuItem> getAllMenuItems() throws SQLException {
         List<MenuItem> menuItems = new ArrayList<>();
-        String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags FROM menu_items ORDER BY item_id";
+        String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock FROM menu_items ORDER BY item_id";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -25,7 +25,8 @@ public class MenuItemDAO {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
-                menuItems.add(new MenuItem(
+                boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                MenuItem item = new MenuItem(
                         rs.getString("item_id"),
                         rs.getString("name"),
                         rs.getString("description"),
@@ -34,7 +35,9 @@ public class MenuItemDAO {
                         active,
                         rs.getString("image_url"),
                         rs.getString("dietary_tags")
-                ));
+                );
+                item.setOutOfStock(outOfStock);
+                menuItems.add(item);
             }
         }
         return menuItems;
@@ -50,7 +53,8 @@ public class MenuItemDAO {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
-                menuItems.add(new MenuItem(
+                boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                MenuItem item = new MenuItem(
                         rs.getString("item_id"),
                         rs.getString("name"),
                         rs.getString("description"),
@@ -59,7 +63,9 @@ public class MenuItemDAO {
                         active,
                         rs.getString("image_url"),
                         rs.getString("dietary_tags")
-                ));
+                );
+                item.setOutOfStock(outOfStock);
+                menuItems.add(item);
             }
         }
         return menuItems;
@@ -67,16 +73,17 @@ public class MenuItemDAO {
     
     public MenuItem getMenuItemById(String itemId) throws SQLException {
         String sql = "SELECT * FROM menu_items WHERE item_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, itemId);
             ResultSet rs = pstmt.executeQuery();
-            
+
             if (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
-                return new MenuItem(
+                boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                MenuItem item = new MenuItem(
                     rs.getString("item_id"),
                     rs.getString("name"),
                     rs.getString("description"),
@@ -86,6 +93,8 @@ public class MenuItemDAO {
                     rs.getString("image_url"),
                     rs.getString("dietary_tags")
                 );
+                item.setOutOfStock(outOfStock);
+                return item;
             }
         }
         return null;
@@ -106,6 +115,7 @@ public class MenuItemDAO {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
+                boolean outOfStock = rs.getInt("out_of_stock") == 1;
                 MenuItemWithInventory item = new MenuItemWithInventory(
                     rs.getString("item_id"),
                     rs.getString("name"),
@@ -123,7 +133,8 @@ public class MenuItemDAO {
                 item.setQtyOnHand(rs.getInt("qty_on_hand"));
                 item.setParLevel(rs.getInt("par_level"));
                 item.setReorderPoint(rs.getInt("reorder_point"));
-                item.setAvailable(available);
+                item.setAvailable(available && !outOfStock);  // Not available if marked out of stock
+                item.setOutOfStock(outOfStock);
                 menuItems.add(item);
             }
         }
@@ -163,7 +174,7 @@ public class MenuItemDAO {
 
     public boolean updateMenuItem(MenuItem menuItem) throws SQLException {
         String sql = "UPDATE menu_items SET name = ?, description = ?, category = ?, " +
-                "price = ?, active = ?, image_url = ?, dietary_tags = ? WHERE item_id = ?";
+                "price = ?, active = ?, image_url = ?, dietary_tags = ?, out_of_stock = ? WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -175,7 +186,8 @@ public class MenuItemDAO {
             pstmt.setBoolean(5, menuItem.getActive());
             pstmt.setString(6, menuItem.getImageUrl());
             pstmt.setString(7, menuItem.getDietaryTags());
-            pstmt.setString(8, menuItem.getItemId());
+            pstmt.setBoolean(8, menuItem.getOutOfStock() != null ? menuItem.getOutOfStock() : false);
+            pstmt.setString(9, menuItem.getItemId());
 
             return pstmt.executeUpdate() > 0;
         }

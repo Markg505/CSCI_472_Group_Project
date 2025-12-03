@@ -12,15 +12,15 @@ public class Reservation {
     private String createdUtc;
     private String guestName;
 
-    // Optional: Include related objects for convenience
     private User user;
     private DiningTable diningTable;
 
-    public Reservation() {}
+    public Reservation() {
+    }
 
     public Reservation(String reservationId, String userId, String tableId,
-                      String startUtc, String endUtc, Integer partySize, 
-                      String status, String notes, String createdUtc) {
+            String startUtc, String endUtc, Integer partySize,
+            String status, String notes, String createdUtc) {
         this.reservationId = reservationId;
         this.userId = userId;
         this.tableId = tableId;
@@ -33,39 +33,99 @@ public class Reservation {
     }
 
     // Getters and setters
-    public String getReservationId() { return reservationId; }
-    public void setReservationId(String reservationId) { this.reservationId = reservationId; }
+    public String getReservationId() {
+        return reservationId;
+    }
 
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
+    public void setReservationId(String reservationId) {
+        this.reservationId = reservationId;
+    }
 
-    public String getTableId() { return tableId; }
-    public void setTableId(String tableId) { this.tableId = tableId; }
+    public String getUserId() {
+        return userId;
+    }
 
-    public String getStartUtc() { return startUtc; }
-    public void setStartUtc(String startUtc) { this.startUtc = startUtc; }
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 
-    public String getEndUtc() { return endUtc; }
-    public void setEndUtc(String endUtc) { this.endUtc = endUtc; }
+    public String getTableId() {
+        return tableId;
+    }
 
-    public Integer getPartySize() { return partySize; }
-    public void setPartySize(Integer partySize) { this.partySize = partySize; }
+    public void setTableId(String tableId) {
+        this.tableId = tableId;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public String getStartUtc() {
+        return startUtc;
+    }
 
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
+    public void setStartUtc(String startUtc) {
+        this.startUtc = startUtc;
+    }
 
-    public String getCreatedUtc() { return createdUtc; }
-    public void setCreatedUtc(String createdUtc) { this.createdUtc = createdUtc; }
+    public String getEndUtc() {
+        return endUtc;
+    }
 
-    public String getGuestName() { return guestName; }
-    public void setGuestName(String guestName) { this.guestName = guestName; }
+    public void setEndUtc(String endUtc) {
+        this.endUtc = endUtc;
+    }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+    public Integer getPartySize() {
+        return partySize;
+    }
 
-    public DiningTable getDiningTable() { return diningTable; }
-    public void setDiningTable(DiningTable diningTable) { this.diningTable = diningTable; }
+    public void setPartySize(Integer partySize) {
+        this.partySize = partySize;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public String getCreatedUtc() {
+        return createdUtc;
+    }
+
+    public void setCreatedUtc(String createdUtc) {
+        this.createdUtc = createdUtc;
+    }
+
+    public String getGuestName() {
+        return guestName;
+    }
+
+    public void setGuestName(String guestName) {
+        this.guestName = guestName;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public DiningTable getDiningTable() {
+        return diningTable;
+    }
+
+    public void setDiningTable(DiningTable diningTable) {
+        this.diningTable = diningTable;
+    }
 }

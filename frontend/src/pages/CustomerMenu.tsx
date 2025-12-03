@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useCart } from "../features/cart/CartContext";
 import { useNotifications } from "../features/notifications/NotificationContext";
 import { apiClient, type MenuItemWithInventory } from "../api/client";
@@ -65,6 +65,8 @@ export default function MenuPage() {
   const [diet, setDiet] = useState<Set<Dietary>>(new Set());
   const [menuItems, setMenuItems] = useState<MenuItemWithInventory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [itemWithNotes, setItemWithNotes] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     const loadMenuItems = async () => {
@@ -83,18 +85,19 @@ export default function MenuPage() {
     loadMenuItems();
   }, []);
 
-  const addToCart = (menuItem: MenuItemWithInventory) => {
-    dispatch({ 
-      type: 'ADD_ITEM', 
+  const addToCart = (menuItem: MenuItemWithInventory, customNotes?: string) => {
+    dispatch({
+      type: 'ADD_ITEM',
       payload: {
         itemId: menuItem.itemId,
         name: menuItem.name,
         price: menuItem.price,
         imageUrl: menuItem.imageUrl,
-        dietaryTags: menuItem.dietaryTags
+        dietaryTags: menuItem.dietaryTags,
+        notes: customNotes
       }
     });
-    
+
     // Show success notification
     addNotification({
       type: 'success',
@@ -103,12 +106,18 @@ export default function MenuPage() {
     });
   };
 
+  const handleAddWithNotes = (menuItem: MenuItemWithInventory) => {
+    addToCart(menuItem, notes);
+    setItemWithNotes(null);
+    setNotes("");
+  };
+
   const enhancedMenu = useMemo(() => {
     return menuItems.map(item => {
       const dietaryTags = parseDietaryTags(item.dietaryTags);
-      const isAvailable = item.active && (!item.inventory || item.inventory.available);
+      const isAvailable = item.active && (!item.inventory || item.inventory.available) && !(item as any).outOfStock;
       const hasLowStock = item.inventory ? item.inventory.qtyOnHand <= item.inventory.reorderPoint : false;
-      
+
       return {
         ...item,
         id: item.itemId,
@@ -246,8 +255,17 @@ export default function MenuPage() {
               {dishes.map((d) => (
                 <article
                   key={d.id}
-                  className="group overflow-hidden rounded-3xl border border-white/10 bg-card hover:border-white/20 transition shadow"
+                  className={`group overflow-hidden rounded-3xl border border-white/10 bg-card transition shadow ${
+                    !d.available ? 'opacity-60 cursor-not-allowed' : 'hover:border-white/20'
+                  }`}
                 >
+                  {!d.available && (
+                    <div className="absolute inset-0 z-10 bg-black/40 rounded-3xl flex items-center justify-center">
+                      <div className="bg-rose-500/90 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg">
+                        Out of Stock
+                      </div>
+                    </div>
+                  )}
                   <div className="h-44 w-full overflow-hidden bg-white/5 flex items-center justify-center">
                     <img
                       src={d.image}
@@ -255,7 +273,9 @@ export default function MenuPage() {
                         (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
                       }}
                       alt={d.name}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      className={`h-full w-full object-cover transition duration-300 ${
+                        d.available ? 'group-hover:scale-[1.03]' : ''
+                      }`}
                       loading="lazy"
                     />
                   </div>
@@ -287,17 +307,68 @@ export default function MenuPage() {
                       ))}
                     </div>
 
-                    <div className="mt-5 flex items-center justify-between">
-                      <button 
-                        className="btn-primary rounded-xl px-4 py-2"
-                        onClick={() => addToCart(d)}
-                        disabled={!d.available}
-                      >
-                        {d.available ? 'Add to order' : 'Out of Stock'}
-                      </button>
-                      <span className="text-xs text-mute">
-                        Ask your server for allergens
-                      </span>
+                    <div className="mt-5 flex flex-col gap-2">
+                      {d.available && itemWithNotes !== d.id && (
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            className="btn-primary rounded-xl px-4 py-2 flex-1"
+                            onClick={() => addToCart(d)}
+                          >
+                            Add to order
+                          </button>
+                          <button
+                            className="btn-ghost rounded-xl px-3 py-2 text-sm"
+                            onClick={() => setItemWithNotes(d.id)}
+                          >
+                            + Notes
+                          </button>
+                        </div>
+                      )}
+
+                      {d.available && itemWithNotes === d.id && (
+                        <div className="space-y-2">
+                          <textarea
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm resize-none"
+                            placeholder="Special instructions or modifications..."
+                            rows={2}
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              className="btn-primary rounded-xl px-4 py-2 flex-1 text-sm"
+                              onClick={() => handleAddWithNotes(d)}
+                            >
+                              Add with notes
+                            </button>
+                            <button
+                              className="btn-ghost rounded-xl px-3 py-2 text-sm"
+                              onClick={() => {
+                                setItemWithNotes(null);
+                                setNotes("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!d.available && (
+                        <div className="relative group/tooltip">
+                          <button
+                            className="btn-primary rounded-xl px-4 py-2 w-full opacity-50 cursor-not-allowed"
+                            disabled
+                          >
+                            Out of Stock
+                          </button>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                            This item is currently out of stock
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/90"></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>

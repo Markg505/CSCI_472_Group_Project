@@ -45,11 +45,15 @@ const CartContext = createContext<{
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const existingItem = state.items.find(item => item.itemId === action.payload.itemId);
+      // Find existing item with same itemId AND same notes (or both undefined/empty)
+      const existingItem = state.items.find(item =>
+        item.itemId === action.payload.itemId &&
+        (item.notes || '') === (action.payload.notes || '')
+      );
 
       if (existingItem) {
         const updatedItems = state.items.map(item =>
-          item.itemId === action.payload.itemId
+          item.itemId === action.payload.itemId && (item.notes || '') === (action.payload.notes || '')
             ? {
                 ...item,
                 qty: item.qty + 1,

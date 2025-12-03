@@ -12,6 +12,7 @@ public class MenuItem {
     private Boolean active;
     private String imageUrl;
     private String dietaryTags;
+    private Boolean outOfStock;
 
     public MenuItem() {}
 
@@ -25,6 +26,7 @@ public class MenuItem {
         this.active = active;
         this.imageUrl = imageUrl;
         this.dietaryTags = dietaryTags;
+        this.outOfStock = false;
     }
 
     // Getters and setters
@@ -51,4 +53,7 @@ public class MenuItem {
 
     public String getDietaryTags() { return dietaryTags; }
     public void setDietaryTags(String dietaryTags) { this.dietaryTags = dietaryTags; }
+
+    public Boolean getOutOfStock() { return outOfStock; }
+    public void setOutOfStock(Boolean outOfStock) { this.outOfStock = outOfStock; }
 }

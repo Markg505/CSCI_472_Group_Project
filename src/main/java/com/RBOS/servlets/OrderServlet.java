@@ -214,6 +214,30 @@ public class OrderServlet extends HttpServlet {
                 }
             }
 
+            // Validate delivery address for delivery orders
+            if ("delivery".equals(order.getFulfillmentType())) {
+                if (order.getDeliveryAddress() == null || order.getDeliveryAddress().isBlank()) {
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        "Delivery address is required for delivery orders");
+                    return;
+                }
+                if (order.getDeliveryCity() == null || order.getDeliveryCity().isBlank()) {
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        "Delivery city is required for delivery orders");
+                    return;
+                }
+                if (order.getDeliveryState() == null || order.getDeliveryState().isBlank()) {
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        "Delivery state is required for delivery orders");
+                    return;
+                }
+                if (order.getDeliveryPostalCode() == null || order.getDeliveryPostalCode().isBlank()) {
+                    response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        "Delivery postal code is required for delivery orders");
+                    return;
+                }
+            }
+
             // recalc totals from surviving items
             double orderSubtotal = 0.0;
             for (OrderItem item : order.getOrderItems()) {
@@ -503,31 +527,17 @@ public class OrderServlet extends HttpServlet {
     }
 
     private void sendOrderNotifications(Order order) {
+        // NOTE: Customer email notifications are now sent directly in OrderDAO.createOrder()
+        // with appropriate templates for delivery vs carryout orders
         try {
+            // Send admin notification
             EmailService emailService = new EmailService();
-            UserDAO userDAO = new UserDAO(getServletContext());
-
-            if (order.getUserId() != null) {
-                User user = userDAO.getUserById(order.getUserId());
-                if (user != null && user.getEmail() != null) {
-                    String estimatedTime = new java.text.SimpleDateFormat("h:mm a")
-                            .format(new java.util.Date(System.currentTimeMillis() + 45 * 60 * 1000));
-
-                    emailService.sendOrderConfirmation(
-                            user.getEmail(),
-                            user.getFullName(),
-                            String.valueOf(order.getOrderId()),
-                            order.getTotal(),
-                            estimatedTime
-                    );
-                }
-            }
-
             emailService.sendAdminNotification(
                     "New Order Received",
-                    String.format("Order #%d - Total: $%.2f", order.getOrderId(), order.getTotal())
+                    String.format("Order #%s - Total: $%.2f", order.getOrderId(), order.getTotal())
             );
 
+            // Send WebSocket notification for real-time updates
             String orderJson = objectMapper.writeValueAsString(order);
             WebSocketConfig.notifyNewOrder(orderJson);
 

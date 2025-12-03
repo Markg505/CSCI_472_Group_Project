@@ -21,6 +21,7 @@ type MenuItemType = {
   dietaryTags: string;
   inventorySku?: string;
   inventoryId?: string;
+  outOfStock?: boolean;
 };
 
 interface EditModalProps {
@@ -369,7 +370,7 @@ export default function MenuAdmin() {
         console.error('Menu item not found');
         return;
       }
-    
+
       const updatedItem: MenuItem = {
         ...existingItem,
         itemId: itemId,
@@ -379,6 +380,30 @@ export default function MenuAdmin() {
       console.log('Toggling active status:', updatedItem);
       const result = await apiClient.updateMenuItem(updatedItem);
       console.log('Toggle active successful:', result);
+      await loadMenuItems();
+    } catch (error) {
+      console.error('Error updating menu item:', error);
+      alert('Failed to update menu item');
+    }
+  };
+
+  const handleToggleOutOfStock = async (itemId: string, currentOutOfStock: boolean) => {
+    try {
+      const existingItem = menuItems.find(item => item.itemId === itemId);
+      if (!existingItem) {
+        console.error('Menu item not found');
+        return;
+      }
+
+      const updatedItem: MenuItem = {
+        ...existingItem,
+        itemId: itemId,
+        outOfStock: !currentOutOfStock
+      };
+
+      console.log('Toggling out of stock status:', updatedItem);
+      const result = await apiClient.updateMenuItem(updatedItem);
+      console.log('Toggle out of stock successful:', result);
       await loadMenuItems();
     } catch (error) {
       console.error('Error updating menu item:', error);
@@ -692,7 +717,7 @@ export default function MenuAdmin() {
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => handleEdit(item)}
                         className="px-3 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
@@ -708,6 +733,17 @@ export default function MenuAdmin() {
                         }`}
                       >
                         {item.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => handleToggleOutOfStock(item.itemId, item.outOfStock || false)}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          item.outOfStock
+                            ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        }`}
+                        title={item.outOfStock ? 'Mark as in stock' : 'Mark as out of stock'}
+                      >
+                        {item.outOfStock ? 'Out of Stock' : 'In Stock'}
                       </button>
                     </div>
                   </td>

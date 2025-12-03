@@ -32,6 +32,7 @@
     <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
     <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
     <property name="jakarta.activation.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.activation-api.jar"/>
+    <property name="jakarta.mail.impl.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail.jar"/>
     <property name="jakarta.websocket.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.websocket-api.jar"/>
     <property name="jakarta.websocket.client.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.websocket-client-api.jar"/>
     <property name="websocket.api.osgi.jar" value="${glassfish.home}/glassfish/modules/webservices-api-osgi.jar"/>
@@ -47,6 +48,7 @@
         </fileset>
         <pathelement location="${servlet.api.jar}"/>
         <pathelement location="${jakarta.mail.api.jar}"/>
+        <pathelement location="${jakarta.mail.impl.jar}"/>
         <pathelement location="${jakarta.activation.api.jar}"/>
         <pathelement location="${jakarta.websocket.api.jar}"/>
         <pathelement location="${jakarta.websocket.client.api.jar}"/>

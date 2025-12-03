@@ -59,7 +59,8 @@ CREATE TABLE menu_items (
   price          REAL NOT NULL CHECK (price >= 0),
   active         INTEGER NOT NULL DEFAULT 1,
   image_url      TEXT,
-  dietary_tags   TEXT
+  dietary_tags   TEXT,
+  out_of_stock   INTEGER NOT NULL DEFAULT 0
 );
 
 -- inventory
@@ -98,9 +99,18 @@ CREATE TABLE orders (
   cart_token  TEXT UNIQUE,
   source      TEXT NOT NULL CHECK (source IN ('web','phone','walkin')) DEFAULT 'web',
   status      TEXT NOT NULL CHECK (status IN ('cart','placed','paid','cancelled')) DEFAULT 'cart',
+  fulfillment_type TEXT CHECK (fulfillment_type IN ('delivery','carryout')) DEFAULT 'carryout',
   subtotal    REAL NOT NULL DEFAULT 0.0,
   tax         REAL NOT NULL DEFAULT 0.0,
   total       REAL NOT NULL DEFAULT 0.0,
+  customer_name TEXT,
+  customer_phone TEXT,
+  delivery_address TEXT,
+  delivery_address2 TEXT,
+  delivery_city TEXT,
+  delivery_state TEXT,
+  delivery_postal_code TEXT,
+  delivery_instructions TEXT,
   created_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
