@@ -11,6 +11,11 @@ export interface User {
   fullName: string;
   email: string;
   phone?: string;
+  address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
 }
 
 export interface DiningTable {
@@ -85,11 +90,20 @@ export interface Order {
   userId?: string;
   source: 'web' | 'phone' | 'walkin';
   status: 'cart' | 'placed' | 'paid' | 'cancelled';
+  fulfillmentType?: 'delivery' | 'carryout';
   subtotal: number;
   tax: number;
   total: number;
   createdUtc?: string;
   orderItems?: OrderItem[];
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  deliveryAddress2?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  deliveryPostalCode?: string;
+  deliveryInstructions?: string;
 }
 
 export interface OrderItem {

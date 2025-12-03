@@ -98,11 +98,20 @@ CREATE TABLE orders (
   cart_token  TEXT UNIQUE,
   source      TEXT NOT NULL CHECK (source IN ('web','phone','walkin')) DEFAULT 'web',
   status      TEXT NOT NULL CHECK (status IN ('cart','placed','paid','cancelled')) DEFAULT 'cart',
+  fulfillment_type TEXT CHECK (fulfillment_type IN ('delivery','carryout')) DEFAULT 'carryout',
   subtotal    REAL NOT NULL DEFAULT 0.0,
   tax         REAL NOT NULL DEFAULT 0.0,
   total       REAL NOT NULL DEFAULT 0.0,
   created_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+  ALTER TABLE orders ADD COLUMN customer_name TEXT;
+  ALTER TABLE orders ADD COLUMN customer_phone TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_address TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_address2 TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_city TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_state TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_postal_code TEXT;
+  ALTER TABLE orders ADD COLUMN delivery_instructions TEXT;
 );
 
 CREATE INDEX idx_orders_by_user ON orders(user_id, created_utc);
