@@ -1,5 +1,6 @@
 package com.RBOS.services;
 
+import java.io.InputStream;
 import java.util.Properties;
 
 public class EmailConfig {
@@ -9,27 +10,40 @@ public class EmailConfig {
     private String password;
     private boolean auth;
     private boolean starttls;
-    
+
     public EmailConfig() {
-        // Default configuration - should be externalized:
-        // # SMTP Configuration
-        // SMTP_HOST=smtp.gmail.com
-        // SMTP_PORT=587
-        // SMTP_USERNAME=tempemail@gmail.com
-        // SMTP_PASSWORD=password
-        // ADMIN_EMAIL=admin@restaurantgem.com
+        // Try to load from properties file first, then fall back to environment variables
+        Properties props = loadPropertiesFile();
 
-        // # For Gmail, you need to:
-        // # 1. Enable 2-factor authentication
-        // # 2. Generate an App Password
-        // # 3. Use the App Password in SMTP_PASSWORD
+        if (props != null && props.getProperty("smtp.username") != null) {
+            // Load from properties file
+            this.host = props.getProperty("smtp.host", "smtp.gmail.com");
+            this.port = Integer.parseInt(props.getProperty("smtp.port", "587"));
+            this.username = props.getProperty("smtp.username");
+            this.password = props.getProperty("smtp.password");
+        } else {
+            // Fall back to environment variables
+            this.host = System.getenv("SMTP_HOST") != null ? System.getenv("SMTP_HOST") : "smtp.gmail.com";
+            this.port = System.getenv("SMTP_PORT") != null ? Integer.parseInt(System.getenv("SMTP_PORT")) : 587;
+            this.username = System.getenv("SMTP_USERNAME");
+            this.password = System.getenv("SMTP_PASSWORD");
+        }
 
-        this.host = System.getenv("SMTP_HOST") != null ? System.getenv("SMTP_HOST") : "smtp.gmail.com";
-        this.port = System.getenv("SMTP_PORT") != null ? Integer.parseInt(System.getenv("SMTP_PORT")) : 587;
-        this.username = System.getenv("SMTP_USERNAME");
-        this.password = System.getenv("SMTP_PASSWORD");
         this.auth = true;
         this.starttls = true;
+    }
+
+    private Properties loadPropertiesFile() {
+        Properties props = new Properties();
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("email.properties")) {
+            if (input != null) {
+                props.load(input);
+                return props;
+            }
+        } catch (Exception e) {
+            System.err.println("Could not load email.properties: " + e.getMessage());
+        }
+        return null;
     }
     
     public Properties getProperties() {

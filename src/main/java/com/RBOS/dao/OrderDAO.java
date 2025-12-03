@@ -297,16 +297,55 @@ public class OrderDAO {
 
                 // send order confirmation email asynchronously
                 try {
-                    EmailService emailService = new EmailService();
-                    String emailBody = EmailTemplates.getOrderConfirmationTemplate(
-                            order.getCustomerName() != null ? order.getCustomerName() : "Valued Customer",
-                            orderId,
-                            order.getTotal() != null ? order.getTotal() : 0.0,
-                            "30 minutes");
-                    emailService.sendEmailAsync(
-                            order.getCustomerPhone(),
-                            "Order Confirmation - " + orderId,
-                            emailBody);
+                    // Get user email if user is logged in
+                    String customerEmail = null;
+                    if (order.getUserId() != null && !order.getUserId().isBlank()) {
+                        String emailQuery = "SELECT email FROM users WHERE user_id = ?";
+                        try (PreparedStatement emailStmt = conn.prepareStatement(emailQuery)) {
+                            emailStmt.setString(1, order.getUserId());
+                            try (ResultSet emailRs = emailStmt.executeQuery()) {
+                                if (emailRs.next()) {
+                                    customerEmail = emailRs.getString("email");
+                                }
+                            }
+                        }
+                    }
+
+                    // Only send email if we have a valid email address
+                    if (customerEmail != null && !customerEmail.isBlank()) {
+                        EmailService emailService = new EmailService();
+                        String customerName = order.getCustomerName() != null ? order.getCustomerName() : "Valued Customer";
+                        String emailBody;
+
+                        // Use delivery template if it's a delivery order
+                        if ("delivery".equals(order.getFulfillmentType())) {
+                            emailBody = EmailTemplates.getDeliveryOrderConfirmationTemplate(
+                                    customerName,
+                                    orderId,
+                                    order.getTotal() != null ? order.getTotal() : 0.0,
+                                    "45-60 minutes",
+                                    order.getDeliveryAddress(),
+                                    order.getDeliveryAddress2(),
+                                    order.getDeliveryCity(),
+                                    order.getDeliveryState(),
+                                    order.getDeliveryPostalCode(),
+                                    order.getDeliveryInstructions());
+                        } else {
+                            // Use carryout template
+                            emailBody = EmailTemplates.getOrderConfirmationTemplate(
+                                    customerName,
+                                    orderId,
+                                    order.getTotal() != null ? order.getTotal() : 0.0,
+                                    "30 minutes");
+                        }
+
+                        emailService.sendEmailAsync(
+                                customerEmail,
+                                "Order Confirmation - " + orderId,
+                                emailBody);
+                    } else {
+                        System.out.println("No email address available for order " + orderId + ", skipping email notification");
+                    }
                 } catch (Exception e) {
                     System.err.println("Failed to send order confirmation email: " + e.getMessage());
                     // Don't fail the order if email fails

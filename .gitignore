@@ -1,15 +1,31 @@
+# Java / Build
+build/
+dist/
+*.class
+*.war
+*.jar
+*.log
+
+# Frontend build artifacts in webapp
+src/main/webapp/assets/
+src/main/webapp/index.html
+src/main/webapp/vite.svg
+
+
+
 # Node / frontend
 frontend/node_modules
 frontend/dist
+
+# Database
+*.db
+!src/main/resources/backend/restaurant.db
+
 # OS
 .DS_Store
 Thumbs.db
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
 
-# AI assistant files
-.github/copilot-instructions.md
-
-*.db
-!src/main/resources/backend/restaurant.db

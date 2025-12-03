@@ -119,6 +119,56 @@ public class EmailTemplates {
         return getBaseTemplate("Order Confirmed", content);
     }
 
+    public static String getDeliveryOrderConfirmationTemplate(String customerName, String orderId,
+            double total, String estimatedTime, String deliveryAddress, String deliveryAddress2,
+            String deliveryCity, String deliveryState, String deliveryPostalCode, String deliveryInstructions) {
+
+        // Build full address string
+        StringBuilder addressBuilder = new StringBuilder();
+        if (deliveryAddress != null && !deliveryAddress.isBlank()) {
+            addressBuilder.append(deliveryAddress);
+        }
+        if (deliveryAddress2 != null && !deliveryAddress2.isBlank()) {
+            addressBuilder.append("<br/>").append(deliveryAddress2);
+        }
+        if (deliveryCity != null && !deliveryCity.isBlank() || deliveryState != null && !deliveryState.isBlank() || deliveryPostalCode != null && !deliveryPostalCode.isBlank()) {
+            addressBuilder.append("<br/>");
+            if (deliveryCity != null && !deliveryCity.isBlank()) {
+                addressBuilder.append(deliveryCity);
+            }
+            if (deliveryState != null && !deliveryState.isBlank()) {
+                addressBuilder.append(", ").append(deliveryState);
+            }
+            if (deliveryPostalCode != null && !deliveryPostalCode.isBlank()) {
+                addressBuilder.append(" ").append(deliveryPostalCode);
+            }
+        }
+
+        String fullAddress = addressBuilder.toString();
+        String instructions = (deliveryInstructions != null && !deliveryInstructions.isBlank())
+            ? "<p><strong>Delivery Instructions:</strong> " + deliveryInstructions + "</p>"
+            : "";
+
+        String content = """
+                <p>Dear %s,</p>
+                <p>Thank you for your delivery order! We're preparing your food with care and will deliver it to you soon.</p>
+
+                <div class="details">
+                    <h3>Order Details</h3>
+                    <p><strong>Order ID:</strong> %s</p>
+                    <p><strong>Total Amount:</strong> $%.2f</p>
+                    <p><strong>Estimated Delivery Time:</strong> %s</p>
+                    <p><strong>Delivery Address:</strong><br/>%s</p>
+                    %s
+                </div>
+
+                <p>Our driver will contact you when they're nearby. Please ensure someone is available to receive the order.</p>
+                <p><strong>The GEM Team</strong></p>
+                """.formatted(customerName, orderId, total, estimatedTime, fullAddress, instructions);
+
+        return getBaseTemplate("Delivery Order Confirmed", content);
+    }
+
     public static String getOrderStatusUpdateTemplate(String customerName, String orderId,
             String status, String updateMessage) {
         String content = """

@@ -40,14 +40,37 @@ export default function CartPage() {
 
     // basic validation for delivery
     if (fulfillmentType === 'delivery') {
-      const addr = useAccountAddress ? undefined : deliveryAddress;
-      if (!useAccountAddress && (!addr || addr.trim() === '')) {
-        alert('Please enter a delivery address.');
+      if (!customerPhone || customerPhone.trim() === '') {
+        alert('Please provide a phone number for delivery orders.');
         return;
       }
-      if (!customerPhone || customerPhone.trim() === '') {
-        alert('Please confirm your phone number.');
-        return;
+
+      // Check if using account address
+      if (useAccountAddress) {
+        // Validate that account has an address
+        const accountAddress = (user as any)?.address;
+        if (!accountAddress || accountAddress.trim() === '') {
+          alert('Your account does not have a delivery address saved. Please uncheck "Use address on my account" and enter a delivery address.');
+          return;
+        }
+      } else {
+        // Validate manually entered address
+        if (!deliveryAddress || deliveryAddress.trim() === '') {
+          alert('Please enter a street address for delivery.');
+          return;
+        }
+        if (!deliveryCity || deliveryCity.trim() === '') {
+          alert('Please enter a city for delivery.');
+          return;
+        }
+        if (!deliveryState || deliveryState.trim() === '') {
+          alert('Please enter a state for delivery.');
+          return;
+        }
+        if (!deliveryPostalCode || deliveryPostalCode.trim() === '') {
+          alert('Please enter a postal code for delivery.');
+          return;
+        }
       }
     }
 
