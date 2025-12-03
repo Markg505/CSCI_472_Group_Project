@@ -1,5 +1,8 @@
 package com.RBOS.servlets;
 
+import com.RBOS.services.EmailService;
+import com.RBOS.services.EmailTemplates;
+
 import com.RBOS.utils.DatabaseConnection;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -156,12 +159,14 @@ public class AuthServlet extends HttpServlet {
             }
             if (isBlank(next) || next.length() < 8 || !hasLetterAndNumber(next)) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                mapper.writeValue(resp.getWriter(), new Msg("New password must be at least 8 characters and include a letter and a number."));
+                mapper.writeValue(resp.getWriter(),
+                        new Msg("New password must be at least 8 characters and include a letter and a number."));
                 return;
             }
             if (next.equals(current)) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                mapper.writeValue(resp.getWriter(), new Msg("New password must be different from the current password."));
+                mapper.writeValue(resp.getWriter(),
+                        new Msg("New password must be different from the current password."));
                 return;
             }
 
@@ -214,7 +219,8 @@ public class AuthServlet extends HttpServlet {
                 System.out.println("Login attempt from " + origin + " for email: " + body.email);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
-                        System.out.println("Login failed from " + origin + " for email: " + body.email + " (user not found)");
+                        System.out.println(
+                                "Login failed from " + origin + " for email: " + body.email + " (user not found)");
                         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         mapper.writeValue(resp.getWriter(), new Msg("invalid_credentials"));
                         return;
@@ -227,7 +233,8 @@ public class AuthServlet extends HttpServlet {
                     String hash = rs.getString("password_hash");
 
                     if (!UserDAO.passwordMatches(body.password, hash)) {
-                        System.out.println("Login failed from " + origin + " for userId: " + userId + " (invalid credentials)");
+                        System.out.println(
+                                "Login failed from " + origin + " for userId: " + userId + " (invalid credentials)");
                         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         mapper.writeValue(resp.getWriter(), new Msg("invalid_credentials"));
                         return;
@@ -314,6 +321,19 @@ public class AuthServlet extends HttpServlet {
                     HttpSession s = req.getSession(true);
                     s.setAttribute("userId", userId);
 
+                    // NEW: send welcome email asynchronously
+                    try {
+                        EmailService emailService = new EmailService();
+                        String emailBody = EmailTemplates.getWelcomeTemplate(user.getFullName());
+                        emailService.sendEmailAsync(
+                                user.getEmail(),
+                                "Welcome to RBOS - Account Created",
+                                emailBody);
+                    } catch (Exception e) {
+                        System.err.println("Failed to send welcome email: " + e.getMessage());
+                        // Don't fail registration if email fails
+                    }
+
                     // Build the SafeUser to return
                     SafeUser su = new SafeUser(
                             userId,
@@ -391,7 +411,8 @@ public class AuthServlet extends HttpServlet {
                     : new ArrayList<>();
 
             Map<String, Inventory> inventoryByItem = buildInventoryMap(incomingAnonItems, existingItems, inventoryDAO);
-            CartMergeService.MergeResult result = new CartMergeService().merge(toMergeItems(incomingAnonItems), existingItems, inventoryByItem);
+            CartMergeService.MergeResult result = new CartMergeService().merge(toMergeItems(incomingAnonItems),
+                    existingItems, inventoryByItem);
 
             Order destination = userCart != null ? userCart : anonymousCart;
 
@@ -436,12 +457,14 @@ public class AuthServlet extends HttpServlet {
             attachment.conflicts = Map.of(
                     "dropped", result.getDropped(),
                     "clamped", result.getClamped(),
-                    "merged", result.getMergedQuantities()
-            );
+                    "merged", result.getMergedQuantities());
             return attachment;
         } catch (SQLException e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ignored) {}
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                }
             }
             return null;
         } finally {
@@ -449,23 +472,27 @@ public class AuthServlet extends HttpServlet {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException ignored) {}
+                } catch (SQLException ignored) {
+                }
             }
         }
     }
 
-    private Map<String, Inventory> buildInventoryMap(List<OrderItem> incomingAnonItems, List<OrderItem> existingItems, InventoryDAO inventoryDAO) throws SQLException {
+    private Map<String, Inventory> buildInventoryMap(List<OrderItem> incomingAnonItems, List<OrderItem> existingItems,
+            InventoryDAO inventoryDAO) throws SQLException {
         Map<String, Inventory> inventoryByItem = new HashMap<>();
 
         for (OrderItem item : incomingAnonItems) {
-            if (item.getItemId() == null) continue;
+            if (item.getItemId() == null)
+                continue;
             if (!inventoryByItem.containsKey(item.getItemId())) {
                 inventoryByItem.put(item.getItemId(), inventoryDAO.getInventoryByItemId(item.getItemId()));
             }
         }
 
         for (OrderItem item : existingItems) {
-            if (item.getItemId() == null) continue;
+            if (item.getItemId() == null)
+                continue;
             if (!inventoryByItem.containsKey(item.getItemId())) {
                 inventoryByItem.put(item.getItemId(), inventoryDAO.getInventoryByItemId(item.getItemId()));
             }
@@ -503,7 +530,8 @@ public class AuthServlet extends HttpServlet {
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
-                if ("cart_token".equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                if ("cart_token".equals(cookie.getName()) && cookie.getValue() != null
+                        && !cookie.getValue().isBlank()) {
                     return cookie.getValue();
                 }
             }
@@ -544,7 +572,8 @@ public class AuthServlet extends HttpServlet {
     }
 
     private boolean isValidEmail(String email) {
-        return email != null && email.contains("@") && email.indexOf('@') > 0 && email.indexOf('@') < email.length() - 1;
+        return email != null && email.contains("@") && email.indexOf('@') > 0
+                && email.indexOf('@') < email.length() - 1;
     }
 
     private boolean hasLetterAndNumber(String value) {
@@ -642,7 +671,8 @@ public class AuthServlet extends HttpServlet {
         existing.setEmail(body.email.trim());
         existing.setPhone(body.phone != null ? body.phone.trim() : null);
 
-        boolean ok = dao.updateProfile(existing.getUserId(), existing.getFullName(), existing.getEmail(), existing.getPhone());
+        boolean ok = dao.updateProfile(existing.getUserId(), existing.getFullName(), existing.getEmail(),
+                existing.getPhone());
         if (!ok)
             return null;
         return new SafeUser(existing.getUserId(), existing.getRole(), existing.getFullName(), existing.getEmail(),

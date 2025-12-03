@@ -1,5 +1,7 @@
 package com.RBOS.dao;
 
+import com.RBOS.services.EmailService;
+import com.RBOS.services.EmailTemplates;
 import com.RBOS.models.Reservation;
 import com.RBOS.models.PagedResult;
 import com.RBOS.utils.DatabaseConnection;
@@ -10,104 +12,105 @@ import java.util.List;
 
 public class ReservationDAO {
     private ServletContext context;
-    
+
     public ReservationDAO(ServletContext context) {
         this.context = context;
     }
-    
+
     public List<Reservation> getAllReservations() throws SQLException {
         List<Reservation> reservations = new ArrayList<>();
         String sql = "SELECT r.*, u.full_name AS user_full_name, u.email, u.phone, dt.name as table_name " +
-                    "FROM reservations r " +
-                    "LEFT JOIN users u ON r.user_id = u.user_id " +
-                    "JOIN dining_tables dt ON r.table_id = dt.table_id " +
-                    "ORDER BY r.start_utc DESC";
-        
+                "FROM reservations r " +
+                "LEFT JOIN users u ON r.user_id = u.user_id " +
+                "JOIN dining_tables dt ON r.table_id = dt.table_id " +
+                "ORDER BY r.start_utc DESC";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
+
             while (rs.next()) {
                 Reservation reservation = new Reservation(
-                    rs.getString("reservation_id"),
-                    rs.getString("user_id"),
-                    rs.getString("table_id"),
-                    rs.getString("start_utc"),
-                    rs.getString("end_utc"),
-                    rs.getInt("party_size"),
-                    rs.getString("status"),
-                    rs.getString("notes"),
-                    rs.getString("created_utc")
-                );
-                reservation.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name") : rs.getString("user_full_name"));
-                
+                        rs.getString("reservation_id"),
+                        rs.getString("user_id"),
+                        rs.getString("table_id"),
+                        rs.getString("start_utc"),
+                        rs.getString("end_utc"),
+                        rs.getInt("party_size"),
+                        rs.getString("status"),
+                        rs.getString("notes"),
+                        rs.getString("created_utc"));
+                reservation.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
+                        : rs.getString("user_full_name"));
+
                 // You could create User and DiningTable objects here if needed
                 reservations.add(reservation);
             }
         }
         return reservations;
     }
-    
+
     public Reservation getReservationById(String reservationId) throws SQLException {
-        String sql = "SELECT r.*, u.full_name AS user_full_name, u.email, u.phone, dt.name as table_name, dt.capacity " +
-                    "FROM reservations r " +
-                    "LEFT JOIN users u ON r.user_id = u.user_id " +
-                    "JOIN dining_tables dt ON r.table_id = dt.table_id " +
-                    "WHERE r.reservation_id = ?";
-        
+        String sql = "SELECT r.*, u.full_name AS user_full_name, u.email, u.phone, dt.name as table_name, dt.capacity "
+                +
+                "FROM reservations r " +
+                "LEFT JOIN users u ON r.user_id = u.user_id " +
+                "JOIN dining_tables dt ON r.table_id = dt.table_id " +
+                "WHERE r.reservation_id = ?";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, reservationId);
             ResultSet rs = pstmt.executeQuery();
-            
+
             if (rs.next()) {
                 Reservation r = new Reservation(
-                    rs.getString("reservation_id"),
-                    rs.getString("user_id"),
-                    rs.getString("table_id"),
-                    rs.getString("start_utc"),
-                    rs.getString("end_utc"),
-                    rs.getInt("party_size"),
-                    rs.getString("status"),
-                    rs.getString("notes"),
-                    rs.getString("created_utc")
-                );
-                r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name") : rs.getString("user_full_name"));
+                        rs.getString("reservation_id"),
+                        rs.getString("user_id"),
+                        rs.getString("table_id"),
+                        rs.getString("start_utc"),
+                        rs.getString("end_utc"),
+                        rs.getInt("party_size"),
+                        rs.getString("status"),
+                        rs.getString("notes"),
+                        rs.getString("created_utc"));
+                r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
+                        : rs.getString("user_full_name"));
                 return r;
             }
         }
         return null;
     }
-    
+
     public List<Reservation> getReservationsByUser(String userId) throws SQLException {
         List<Reservation> reservations = new ArrayList<>();
         String sql = "SELECT r.*, dt.name as table_name, u.full_name AS user_full_name " +
-                    "FROM reservations r " +
-                    "JOIN dining_tables dt ON r.table_id = dt.table_id " +
-                    "LEFT JOIN users u ON r.user_id = u.user_id " +
-                    "WHERE r.user_id = ? " +
-                    "ORDER BY r.start_utc DESC";
-        
+                "FROM reservations r " +
+                "JOIN dining_tables dt ON r.table_id = dt.table_id " +
+                "LEFT JOIN users u ON r.user_id = u.user_id " +
+                "WHERE r.user_id = ? " +
+                "ORDER BY r.start_utc DESC";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, userId);
             ResultSet rs = pstmt.executeQuery();
-            
+
             while (rs.next()) {
                 Reservation r = new Reservation(
-                    rs.getString("reservation_id"),
-                    rs.getString("user_id"),
-                    rs.getString("table_id"),
-                    rs.getString("start_utc"),
-                    rs.getString("end_utc"),
-                    rs.getInt("party_size"),
-                    rs.getString("status"),
-                    rs.getString("notes"),
-                    rs.getString("created_utc")
-                );
-                r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name") : rs.getString("user_full_name"));
+                        rs.getString("reservation_id"),
+                        rs.getString("user_id"),
+                        rs.getString("table_id"),
+                        rs.getString("start_utc"),
+                        rs.getString("end_utc"),
+                        rs.getInt("party_size"),
+                        rs.getString("status"),
+                        rs.getString("notes"),
+                        rs.getString("created_utc"));
+                r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
+                        : rs.getString("user_full_name"));
                 reservations.add(r);
             }
         }
@@ -115,7 +118,7 @@ public class ReservationDAO {
     }
 
     public PagedResult<Reservation> getReservationsWithFilters(String status, String startUtc, String endUtc,
-                                                              String userId, int page, int pageSize) throws SQLException {
+            String userId, int page, int pageSize) throws SQLException {
         List<Reservation> reservations = new ArrayList<>();
         List<String> params = new ArrayList<>();
         int total = 0;
@@ -175,9 +178,9 @@ public class ReservationDAO {
                                 dataRs.getInt("party_size"),
                                 dataRs.getString("status"),
                                 dataRs.getString("notes"),
-                                dataRs.getString("created_utc")
-                        );
-                        r.setGuestName(dataRs.getString("guest_name") != null ? dataRs.getString("guest_name") : dataRs.getString("user_full_name"));
+                                dataRs.getString("created_utc"));
+                        r.setGuestName(dataRs.getString("guest_name") != null ? dataRs.getString("guest_name")
+                                : dataRs.getString("user_full_name"));
                         reservations.add(r);
                     }
                 }
@@ -185,17 +188,18 @@ public class ReservationDAO {
         }
         return new PagedResult<>(reservations, total);
     }
-    
+
     public String createReservation(Reservation reservation) throws SQLException {
         String reservationId = reservation.getReservationId() != null
                 ? reservation.getReservationId()
                 : java.util.UUID.randomUUID().toString();
-        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, table_id, start_utc, end_utc, party_size, status, notes) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
+        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, table_id, start_utc, end_utc, party_size, status, notes) "
+                +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
             pstmt.setString(1, reservationId);
             pstmt.setString(2, reservation.getUserId());
             pstmt.setString(3, reservation.getGuestName());
@@ -205,23 +209,51 @@ public class ReservationDAO {
             pstmt.setInt(7, reservation.getPartySize());
             pstmt.setString(8, reservation.getStatus() != null ? reservation.getStatus() : "pending");
             pstmt.setString(9, reservation.getNotes());
-            
+
             int affectedRows = pstmt.executeUpdate();
-            
+
             if (affectedRows > 0) {
+                // send reservation confirmation email asynchronously
+                try {
+                    Reservation fullReservation = getReservationById(reservationId);
+                    if (fullReservation != null) {
+                        EmailService emailService = new EmailService();
+
+                        // Get email from user (you're logged in)
+                        String userEmail = getUserEmailById(reservation.getUserId());
+                        if (userEmail != null && !userEmail.isEmpty()) {
+                            String emailBody = EmailTemplates.getReservationConfirmationTemplate(
+                                    reservation.getGuestName() != null ? reservation.getGuestName() : "Valued Guest",
+                                    reservation.getStartUtc(),
+                                    reservation.getStartUtc(),
+                                    reservation.getPartySize(),
+                                    "Table " + reservation.getTableId(),
+                                    reservationId);
+
+                            emailService.sendEmailAsync(
+                                    userEmail,
+                                    "Reservation Confirmed - " + reservationId,
+                                    emailBody);
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send reservation confirmation email: " + e.getMessage());
+                    // Don't fail the reservation if email fails
+                }
+
                 return reservationId;
             }
         }
         return null;
     }
-    
+
     public boolean updateReservation(Reservation reservation) throws SQLException {
         String sql = "UPDATE reservations SET user_id = ?, guest_name = ?, table_id = ?, start_utc = ?, end_utc = ?, " +
-                    "party_size = ?, status = ?, notes = ? WHERE reservation_id = ?";
-        
+                "party_size = ?, status = ?, notes = ? WHERE reservation_id = ?";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, reservation.getUserId());
             pstmt.setString(2, reservation.getGuestName());
             pstmt.setString(3, reservation.getTableId());
@@ -231,30 +263,72 @@ public class ReservationDAO {
             pstmt.setString(7, reservation.getStatus());
             pstmt.setString(8, reservation.getNotes());
             pstmt.setString(9, reservation.getReservationId());
-            
+
             return pstmt.executeUpdate() > 0;
         }
     }
-    
+
     public boolean updateReservationStatus(String reservationId, String status) throws SQLException {
         String sql = "UPDATE reservations SET status = ? WHERE reservation_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, status);
             pstmt.setString(2, reservationId);
-            
-            return pstmt.executeUpdate() > 0;
+
+            boolean updated = pstmt.executeUpdate() > 0;
+
+            // NEW: send status update email
+            if (updated) {
+                try {
+                    Reservation reservation = getReservationById(reservationId);
+                    if (reservation != null) {
+                        String userEmail = getUserEmailById(reservation.getUserId());
+                        if (userEmail != null && !userEmail.isEmpty()) {
+                            EmailService emailService = new EmailService();
+                            String emailBody = EmailTemplates.getReservationUpdateTemplate(
+                                    reservation.getGuestName(),
+                                    reservation.getStartUtc(),
+                                    reservation.getStartUtc(),
+                                    status,
+                                    reservationId);
+                            emailService.sendEmailAsync(
+                                    userEmail,
+                                    "Reservation Status Update - " + reservationId,
+                                    emailBody);
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send status update email: " + e.getMessage());
+                }
+            }
+
+            return updated;
         }
     }
-    
+
+    private String getUserEmailById(String userId) throws SQLException {
+        String sql = "SELECT email FROM users WHERE user_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection(context);
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("email");
+                }
+            }
+        }
+        return null;
+    }
+
     public boolean deleteReservation(String reservationId) throws SQLException {
         String sql = "DELETE FROM reservations WHERE reservation_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, reservationId);
             return pstmt.executeUpdate() > 0;
         }

@@ -102,16 +102,16 @@ CREATE TABLE orders (
   subtotal    REAL NOT NULL DEFAULT 0.0,
   tax         REAL NOT NULL DEFAULT 0.0,
   total       REAL NOT NULL DEFAULT 0.0,
+  customer_name TEXT,
+  customer_phone TEXT,
+  delivery_address TEXT,
+  delivery_address2 TEXT,
+  delivery_city TEXT,
+  delivery_state TEXT,
+  delivery_postal_code TEXT,
+  delivery_instructions TEXT,
   created_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
-  ALTER TABLE orders ADD COLUMN customer_name TEXT;
-  ALTER TABLE orders ADD COLUMN customer_phone TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_address TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_address2 TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_city TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_state TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_postal_code TEXT;
-  ALTER TABLE orders ADD COLUMN delivery_instructions TEXT;
 );
 
 CREATE INDEX idx_orders_by_user ON orders(user_id, created_utc);

@@ -3,6 +3,8 @@ package com.RBOS.dao;
 import com.RBOS.models.Order;
 import com.RBOS.models.OrderItem;
 import com.RBOS.models.PagedResult;
+import com.RBOS.services.EmailService;
+import com.RBOS.services.EmailTemplates;
 import com.RBOS.utils.DatabaseConnection;
 import jakarta.servlet.ServletContext;
 import java.sql.*;
@@ -292,6 +294,24 @@ public class OrderDAO {
                         orderItemDAO.createOrderItem(item, conn);
                     }
                 }
+
+                // send order confirmation email asynchronously
+                try {
+                    EmailService emailService = new EmailService();
+                    String emailBody = EmailTemplates.getOrderConfirmationTemplate(
+                            order.getCustomerName() != null ? order.getCustomerName() : "Valued Customer",
+                            orderId,
+                            order.getTotal() != null ? order.getTotal() : 0.0,
+                            "30 minutes");
+                    emailService.sendEmailAsync(
+                            order.getCustomerPhone(),
+                            "Order Confirmation - " + orderId,
+                            emailBody);
+                } catch (Exception e) {
+                    System.err.println("Failed to send order confirmation email: " + e.getMessage());
+                    // Don't fail the order if email fails
+                }
+
                 return orderId;
             }
         }
