@@ -94,6 +94,7 @@ export default function Bookings() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false); // toggles settings panel
+  const [statusFilter, setStatusFilter] = useState<'all' | Reservation['status']>('all');
 
   // load reservations + settings on mount
   useEffect(() => { loadReservations(); loadSettings(); loadTables(); }, []);
@@ -114,26 +115,19 @@ export default function Bookings() {
   async function loadReservations() {
     try {
       setLoading(true);
-      const data = await apiClient.getReservationHistory({ pageSize: 50 });
-      const items = data?.items ?? [];
-      if (items.length === 0) {
-        // fallback to raw list if history endpoint is empty or filtered server-side
-        const raw = await apiClient.getReservations();
-        setReservations(raw ?? []);
-        setHistoryMeta(data ?? null);
-      } else {
-        setReservations(items);
-        setHistoryMeta(data);
+      // Always load the live list to reflect newest saves
+      const raw = await apiClient.getReservations();
+      setReservations(raw ?? []);
+      // Try to also load history metadata if available
+      try {
+        const hist = await apiClient.getReservationHistory({ pageSize: 50 });
+        setHistoryMeta(hist ?? null);
+      } catch {
+        setHistoryMeta(null);
       }
     } catch (error) {
       console.error('Error loading reservations:', error);
-      try {
-        const raw = await apiClient.getReservations();
-        setReservations(raw ?? []);
-      } catch (inner) {
-        console.error('Fallback load failed', inner);
-        setReservations([]);
-      }
+      setReservations([]);
     } finally {
       setLoading(false);
     }
@@ -311,16 +305,20 @@ export default function Bookings() {
 
   const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleString() : '—');
 
-  // tabs: current = start >= today; history = start < today
-  const todayStart = startOfToday();
+  // tabs: current = start date >= today (date-only compare to avoid timezone shifts)
+  const todayDateStr = new Date().toISOString().slice(0, 10);
   const currentReservations = reservations.filter(r => {
     if (!r.startUtc) return true;
-    return new Date(r.startUtc) >= todayStart;
+    const startDateStr = r.startUtc.slice(0, 10);
+    return startDateStr >= todayDateStr;
   });
   const historyReservations = reservations.filter(r => {
     if (!r.startUtc) return false;
-    return new Date(r.startUtc) < todayStart;
+    const startDateStr = r.startUtc.slice(0, 10);
+    return startDateStr < todayDateStr;
   });
+  const statusFiltered = (list: Reservation[]) =>
+    statusFilter === 'all' ? list : list.filter(r => r.status === statusFilter);
 
   function exportCSV() {
     const header = ['ID','Customer ID','Table ID','Start Time','End Time','Party Size','Status','Notes'];
@@ -622,6 +620,20 @@ export default function Bookings() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+            <div className="text-sm font-semibold text-slate-800">Reservations</div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              aria-label="Filter reservations by status"
+            >
+              <option value="all">All statuses</option>
+              {statusOptions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
           <table className="w-full border-collapse">
             <thead className="bg-slate-50">
               <tr className="text-left text-sm text-slate-600">
@@ -636,7 +648,7 @@ export default function Bookings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {(tab === 'history' ? historyReservations : currentReservations).map(r => (
+              {statusFiltered(tab === 'history' ? historyReservations : currentReservations).map(r => (
                 <tr key={r.reservationId ?? ''} className="text-sm">
                   <td className="px-3 py-2">{r.reservationId ?? '—'}</td>
                   <td className="px-3 py-2">

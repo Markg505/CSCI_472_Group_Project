@@ -19,7 +19,7 @@ import Menu from "../pages/Admin/Menu";
 import Tables from "../pages/Admin/Tables";
 import Inventory from "../pages/Admin/Inventory";
 import Settings from "../pages/Admin/Settings";
-// import Reports from '../pages/Admin/Reports';
+import Reports from "../pages/Admin/Reports";
 
 export const router = createBrowserRouter(
   [
@@ -47,6 +47,7 @@ export const router = createBrowserRouter(
             { path: "tables", element: <Tables /> },
             { path: "inventory", element: <Inventory /> },
             { path: "orders", element: <Orders /> },
+            { path: "reports", element: <Reports /> },
             { path: "settings", element: <Settings /> },
           ],
         },

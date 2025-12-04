@@ -200,6 +200,7 @@ export interface SalesAnalytics {
   revenueTimeline: Array<{ date: string; revenue: number }>;
   orderCountTimeline: Array<{ date: string; count: number }>;
   sourceDistribution: Array<{ source: string; count: number }>;
+  sourceTotals?: Array<{ source: string; revenue: number; count: number }>;
   totalRevenue: number;
   totalOrders: number;
   avgOrderValue: number;
@@ -217,6 +218,7 @@ export interface MenuPerformance {
   topItems: Array<{
     itemId: string;
     name: string;
+    category?: string;
     revenue: number;
     quantity: number;
     price: number;
@@ -224,6 +226,17 @@ export interface MenuPerformance {
   categoryPerformance: Array<{ category: string; revenue: number }>;
   totalMenuItems: number;
   activeMenuItems: number;
+}
+
+export interface AuditLogEntry {
+  timestamp: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  userId: string;
+  userName: string;
+  oldValue?: string;
+  newValue?: string;
 }
 export interface BookingSettings {
   openTime: string;                 
@@ -571,6 +584,50 @@ async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings>
   async getMenuPerformance(): Promise<MenuPerformance> {
     return this.request('/reports/menu-performance');
   }
+
+  async getAuditLogEntries(entityType?: string): Promise<AuditLogEntry[]> {
+    const query = entityType ? `?entityType=${encodeURIComponent(entityType)}` : '';
+    const response = await fetch(`${this.baseURL}/audit-log/export${query}`, {
+      headers: { Accept: 'text/csv' },
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error(`Audit log export failed: ${response.status}`);
+    }
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    const entries: AuditLogEntry[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      if (cols.length < 8) continue;
+      const [timestamp, eType, entityId, action, userId, userName, oldValue, newValue] = cols;
+      entries.push({ timestamp, entityType: eType, entityId, action, userId, userName, oldValue, newValue });
+    }
+    return entries;
+  }
+}
+
+// Minimal CSV parser for audit log export (handles quoted commas)
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 export const apiClient = new ApiClient();
