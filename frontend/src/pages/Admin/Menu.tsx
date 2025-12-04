@@ -30,9 +30,10 @@ interface EditModalProps {
   item: MenuItemType;
   onClose: () => void;
   onUpdate: (updatedItem: MenuItemType) => void;
+  validInventorySkus: string[];
 }
 
-function EditModal({ item, onClose, onUpdate }: EditModalProps) {
+function EditModal({ item, onClose, onUpdate, validInventorySkus }: EditModalProps) {
   const [form, setForm] = useState({
     itemId: item.itemId,
     name: item.name,
@@ -45,9 +46,26 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
   });
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    if (!form.name.trim() || !form.itemId.trim()) {
+      setError('Item ID and name are required.');
+      return;
+    }
+    const priceVal = parseFloat(form.price);
+    if (Number.isNaN(priceVal) || priceVal < 0) {
+      setError('Price must be a non-negative number.');
+      return;
+    }
+    if (form.inventorySku && !validInventorySkus.includes(form.inventorySku.trim())) {
+      setError('Inventory SKU not found. Please link to an existing inventory item.');
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -60,7 +78,7 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
           category: form.category,
           dietaryTags: form.dietaryTags,
           imageUrl: imageUrl,
-          inventorySku: form.inventorySku || undefined
+          inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined
         };
 
       console.log('Updating menu item:', updatedItem);
@@ -70,7 +88,7 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
       onClose();
     } catch (error) {
       console.error('Error updating menu item:', error);
-      alert('Failed to update menu item. Check console for details.');
+      setError('Failed to update menu item. Check console for details.');
     } finally {
       setLoading(false);
     }
@@ -223,7 +241,16 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
               <p className="text-xs text-gray-500 mt-1">
                 Provide the SKU from Inventory to link stock tracking to this menu item.
               </p>
+              {form.inventorySku && !validInventorySkus.includes(form.inventorySku.trim()) && (
+                <p className="text-xs text-rose-600 mt-1">SKU not found in inventory.</p>
+              )}
             </div>
+
+            {error && (
+              <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button
@@ -248,7 +275,6 @@ function EditModal({ item, onClose, onUpdate }: EditModalProps) {
   );
 }
 
-// Helper function to generate random 8-digit string
 const generateRandomItemId = (): string => {
   return Math.floor(10000000 + Math.random() * 90000000).toString();
 };
@@ -258,6 +284,11 @@ export default function MenuAdmin() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItemType | null>(null);
+  const [inventorySkus, setInventorySkus] = useState<string[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState<string>(() => {
+    try { return localStorage.getItem("rbos_delivery_fee") ?? ""; } catch { return ""; }
+  });
   const [form, setForm] = useState({
     itemId: generateRandomItemId(),
     name: '',
@@ -274,14 +305,13 @@ export default function MenuAdmin() {
     loadMenuItems();
   }, []);
 
-  // Generate new random ID when add form is opened
   useEffect(() => {
     if (showAdd) {
-      setForm(prev => ({
-        ...prev,
-        itemId: generateRandomItemId()
-      }));
-    }
+    setForm(prev => ({
+      ...prev,
+      itemId: generateRandomItemId()
+    }));
+  }
   }, [showAdd]);
 
   const loadMenuItems = async () => {
@@ -292,10 +322,12 @@ export default function MenuAdmin() {
         apiClient.listInventory().catch(() => [] as any[])
       ]);
       const skuByItem: Record<string, string> = {};
+      const skus: string[] = [];
       (inventory || []).forEach((inv: any) => {
         if (inv && inv.itemId && inv.sku) {
           skuByItem[inv.itemId] = inv.sku;
         }
+        if (inv?.sku) skus.push(inv.sku);
       });
       const mapped = items.map((mi: any) => ({
         ...mi,
@@ -303,6 +335,11 @@ export default function MenuAdmin() {
       }));
       console.log('Loaded menu items with inventory mapping:', mapped);
       setMenuItems(mapped);
+      setInventorySkus(skus);
+      try {
+        const storedFee = localStorage.getItem("rbos_delivery_fee");
+        if (storedFee !== null) setDeliveryFee(storedFee);
+      } catch {/* ignore */}
     } catch (error) {
       console.error('Error loading menu items:', error);
       alert('Failed to load menu items');
@@ -318,17 +355,31 @@ export default function MenuAdmin() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    if (!form.itemId.trim() || !form.name.trim()) {
+      setFormError('Item ID and name are required.');
+      return;
+    }
+    const priceVal = parseFloat(form.price);
+    if (Number.isNaN(priceVal) || priceVal < 0) {
+      setFormError('Price must be a non-negative number.');
+      return;
+    }
+    if (form.inventorySku && !inventorySkus.includes(form.inventorySku.trim())) {
+      setFormError('Inventory SKU not found. Please link to an existing inventory item.');
+      return;
+    }
     try {
       const newItem = {
         itemId: form.itemId,
         name: form.name,
-        price: parseFloat(form.price),
+        price: priceVal,
         active: form.active,
         imageUrl: form.imageUrl,
         dietaryTags: form.dietaryTags,
         description: form.description,
         category: form.category,
-        inventorySku: form.inventorySku || undefined
+        inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined
       };
 
       console.log('Creating menu item:', newItem);
@@ -489,10 +540,40 @@ export default function MenuAdmin() {
         </div>
       </div>
 
+      {/* Delivery fee config */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h4 className="font-semibold text-gray-900">Delivery Fee</h4>
+            <p className="text-sm text-gray-500">Set the flat delivery charge applied at checkout.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">$</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={deliveryFee}
+              onChange={(e) => {
+                setDeliveryFee(e.target.value);
+                try { localStorage.setItem("rbos_delivery_fee", e.target.value); } catch { /* ignore */ }
+              }}
+              className="w-32 rounded-md border border-gray-300 px-3 py-2"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Add Item Form */}
       {showAdd && (
         <form onSubmit={handleAddItem} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-semibold mb-4">Add New Menu Item</h3>
+          {formError && (
+            <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+              {formError}
+            </div>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -589,6 +670,9 @@ export default function MenuAdmin() {
               <p className="text-xs text-gray-500 mt-1">
                 Provide the SKU from Inventory to link stock tracking to this menu item.
               </p>
+              {form.inventorySku && !inventorySkus.includes(form.inventorySku.trim()) && (
+                <p className="text-xs text-rose-600 mt-1">SKU not found in inventory.</p>
+              )}
             </div>
 
           <div className="mb-4">
@@ -773,6 +857,7 @@ export default function MenuAdmin() {
           item={editingItem}
           onClose={() => setEditingItem(null)}
           onUpdate={handleUpdateItem}
+          validInventorySkus={inventorySkus}
         />
       )}
     </div>

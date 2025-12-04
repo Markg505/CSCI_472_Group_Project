@@ -1,4 +1,3 @@
-// src/features/admin/Users.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckIcon,
@@ -10,6 +9,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useAuth } from "../../features/auth/useAuth";
 import { apiClient, type User } from '../../api/client';
 import AuditLogButton from "../../components/AuditLogButton";
+import { Navigate } from "react-router-dom";
 
 type RawUser = Partial<User>;
 
@@ -28,13 +28,17 @@ function safePhone(u: RawUser) {
 function safeRole(u: RawUser) {
   return (u.role ?? "customer") as User["role"];
 }
+function isSuperAdmin(u: RawUser) {
+  const role = String((u as any)?.role ?? "").toLowerCase();
+  const flag = Boolean((u as any)?.isSuperAdmin);
+  const email = safeEmail(u).toLowerCase();
+  return role === "super_admin" || flag || email === "superadmin@rbos.com";
+}
 
 export default function Users() {
   const [rows, setRows] = useState<RawUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-
-  // --- edit state ---
   const [editUser, setEditUser] = useState<RawUser | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", role: "customer" });
 
@@ -63,6 +67,7 @@ export default function Users() {
   }, []);
 
   const adminCount = useMemo(() => rows.filter(r => safeRole(r).toLowerCase() === "admin").length, [rows]);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +85,7 @@ export default function Users() {
       await load();
       setForm({ name: "", email: "", phone: "", role: "customer", password: "" });
       setShowAdd(false);
+      setStatusMsg("User created.");
     } catch (err: any) {
       console.error("add failed", err);
       alert(err?.message ?? "Add failed");
@@ -88,11 +94,15 @@ export default function Users() {
 
   async function onDelete(u: RawUser) {
     if (!isAdmin) return alert("Only admins can delete users.");
+    if (isSuperAdmin(u)) {
+      return alert("Super-admin accounts cannot be deleted.");
+    }
     if (!confirm("Delete this user? This action cannot be undone.")) return;
     const id = safeId(u);
     try {
       await apiClient.deleteUser(String(id));
       await load();
+      setStatusMsg("User deleted.");
     } catch (err: any) {
       console.error("delete failed", err);
       alert(err?.message ?? "Delete failed");
@@ -102,6 +112,9 @@ export default function Users() {
  
   function startEdit(u: RawUser) {
     if (!isAdmin) return alert("Only admins can edit users.");
+    if (isSuperAdmin(u)) {
+      return alert("Super-admin accounts cannot be edited.");
+    }
     setEditUser(u);
     setEditForm({
       name: safeName(u),
@@ -109,22 +122,23 @@ export default function Users() {
       phone: safePhone(u),
       role: safeRole(u),
     });
-    setShowAdd(false); // ensure only one form visible
+    setShowAdd(false);
   }
 
-  // cancel edit
   function cancelEdit() {
     setEditUser(null);
     setEditForm({ name: "", email: "", phone: "", role: "customer" });
   }
 
-  // save edit
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!isAdmin) return alert("Only admins can edit users.");
     if (!editUser) return;
     const id = (safeId(editUser));
     if (!id) return alert("Missing user id");
+    if (isSuperAdmin(editUser)) {
+      return alert("Super-admin accounts cannot be edited.");
+    }
 
     try {
       await apiClient.updateUser({
@@ -136,6 +150,7 @@ export default function Users() {
       } as User);
       await load();
       cancelEdit();
+      setStatusMsg("User updated.");
     } catch (err: any) {
       console.error("update failed", err);
       alert(err?.message ?? "Update failed");
@@ -159,9 +174,12 @@ export default function Users() {
     URL.revokeObjectURL(url);
   }
 
+  if (!isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <div className="space-y-6 text-slate-900">
-      {/* Header */}
       <div className="lg:flex lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl/7 font-bold text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">Users</h2>
@@ -225,6 +243,12 @@ export default function Users() {
         </div>
       </div>
 
+      {statusMsg && (
+        <div className="rounded-md border border-green-200 bg-green-50 text-green-700 px-3 py-2 text-sm">
+          {statusMsg}
+        </div>
+      )}
+
       
       {showAdd && !editUser && (
         <form onSubmit={onAdd} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -267,7 +291,6 @@ export default function Users() {
         </form>
       )}
 
-      {/* Edit user form (prefilled) */}
       {editUser && (
         <form onSubmit={saveEdit} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="flex flex-wrap items-end gap-2">
@@ -299,7 +322,6 @@ export default function Users() {
         </form>
       )}
 
-      {/* Table */}
       {loading ? (
         <p>Loading…</p>
       ) : (

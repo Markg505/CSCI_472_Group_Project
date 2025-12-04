@@ -21,6 +21,11 @@ CREATE TABLE users (
   full_name      TEXT NOT NULL,
   email          TEXT UNIQUE,
   phone          TEXT,
+  address        TEXT,
+  address2       TEXT,
+  city           TEXT,
+  state          TEXT,
+  postal_code    TEXT,
   password_hash  TEXT
 );
 
@@ -28,7 +33,10 @@ CREATE TABLE users (
 CREATE TABLE dining_tables (
   table_id   TEXT PRIMARY KEY,
   name       TEXT NOT NULL UNIQUE,
-  capacity   INTEGER NOT NULL CHECK (capacity > 0)
+  capacity   INTEGER NOT NULL CHECK (capacity > 0),
+  base_price REAL DEFAULT 0.0,
+  pos_x      REAL,
+  pos_y      REAL
 );
 
 -- reservations
@@ -36,6 +44,8 @@ CREATE TABLE reservations (
   reservation_id TEXT PRIMARY KEY,
   user_id        TEXT,
   guest_name     TEXT,
+  contact_email  TEXT,
+  contact_phone  TEXT,
   table_id       TEXT NOT NULL,
   start_utc      TEXT NOT NULL,
   end_utc        TEXT NOT NULL,
@@ -105,6 +115,7 @@ CREATE TABLE orders (
   total       REAL NOT NULL DEFAULT 0.0,
   customer_name TEXT,
   customer_phone TEXT,
+  customer_email TEXT,
   delivery_address TEXT,
   delivery_address2 TEXT,
   delivery_city TEXT,
@@ -155,15 +166,15 @@ BEGIN TRANSACTION;
 
 -- USERS (8)
 -- Default passwords: admin123 for admin, customer123 for customers, staff123 for staff
-INSERT INTO users (user_id, role, full_name, email, phone, password_hash) VALUES
-  ('1', 'admin',    'Admin Admin',     'admin@rbos.com',   '555-1001', 'admin123'),
-  ('2', 'staff',    'Jordan Kim',      'jordan@rbos.com',  '555-1002', 'staff123'),
-  ('3', 'staff',    'Riley Nguyen',    'riley@rbos.com',   '555-1003', 'staff123'),
-  ('4', 'customer', 'Marcus Giannini', 'marcus@example.com', '555-2001', 'customer123'),
-  ('5', 'customer', 'Sam Taylor',      'sam@example.com',    '555-2002', 'customer123'),
-  ('6', 'customer', 'Casey Lee',       'casey@example.com',  '555-2003', 'customer123'),
-  ('7', 'customer', 'Morgan Diaz',     'morgan@example.com', '555-2004', 'customer123'),
-  ('8', 'customer', 'Jamie Fox',       'jamie@example.com',  '555-2005', 'customer123');
+INSERT INTO users (user_id, role, full_name, email, phone, address, address2, city, state, postal_code, password_hash) VALUES
+  ('1', 'admin',    'Admin Admin',     'admin@rbos.com',     '555-1001', '123 Admin St', NULL, 'Admin City', 'AA', '00000', 'admin123'),
+  ('2', 'staff',    'Jordan Kim',      'jordan@rbos.com',    '555-1002', '456 Staff Rd', NULL, 'Staffville', 'SS', '11111', 'staff123'),
+  ('3', 'staff',    'Riley Nguyen',    'riley@rbos.com',     '555-1003', '789 Team Ln',  NULL, 'Teamtown',   'SS', '22222', 'staff123'),
+  ('4', 'customer', 'Marcus Giannini', 'marcus@example.com', '555-2001', '123 Fake Street', NULL, 'Portales', 'NM', '90210', 'customer123'),
+  ('5', 'customer', 'Sam Taylor',      'sam@example.com',    '555-2002', '10 Elm St', NULL, 'Springfield', 'IL', '62701', 'customer123'),
+  ('6', 'customer', 'Casey Lee',       'casey@example.com',  '555-2003', '22 Pine Ave', NULL, 'Portland', 'OR', '97201', 'customer123'),
+  ('7', 'customer', 'Morgan Diaz',     'morgan@example.com', '555-2004', '55 Lake Rd', NULL, 'Austin', 'TX', '73301', 'customer123'),
+  ('8', 'customer', 'Jamie Fox',       'jamie@example.com',  '555-2005', '77 Market St', NULL, 'Denver', 'CO', '80202', 'customer123');
 
 -- DINING TABLES (10)
 INSERT INTO dining_tables (table_id, name, capacity) VALUES

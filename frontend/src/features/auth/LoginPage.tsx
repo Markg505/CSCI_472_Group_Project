@@ -45,6 +45,13 @@ export default function LoginPage() {
       }
 
       if (me) {
+        // Restrict staff/admin from signing in via the customer login page
+        if (me.role === "staff" || me.role === "admin") {
+          await fetch("/RBOS/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+          localStorage.removeItem("rbos_user");
+          throw new Error("Please use the Staff/Admin login page to sign in.");
+        }
+
         try { localStorage.setItem("rbos_user", JSON.stringify(me)); } catch { /* Ignore localStorage errors */ }
         console.log("Login OK, /me =", me); setUser(me); console.log("LoginPage setUser done");
       } else {

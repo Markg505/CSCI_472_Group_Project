@@ -53,6 +53,7 @@ public class AuthServlet extends HttpServlet {
 
     private void initialize(ServletConfig config) {
         mapper = new ObjectMapper();
+        mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         servletContext = config != null ? config.getServletContext() : null;
     }
 
@@ -104,10 +105,20 @@ public class AuthServlet extends HttpServlet {
             String fullName = safeTrim(body != null ? body.fullName : null);
             String email = safeTrim(body != null ? body.email : null);
             String phone = safeTrim(body != null ? body.phone : null);
+            String address = safeTrim(body != null ? body.address : null);
+            String address2 = safeTrim(body != null ? body.address2 : null);
+            String city = safeTrim(body != null ? body.city : null);
+            String state = safeTrim(body != null ? body.state : null);
+            String postalCode = safeTrim(body != null ? body.postalCode : null);
 
             if (isBlank(fullName) || isBlank(email) || !isValidEmail(email)) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 mapper.writeValue(resp.getWriter(), new Msg("Full name and a valid email are required."));
+                return;
+            }
+            if (isBlank(address) || isBlank(city) || isBlank(state) || isBlank(postalCode)) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                mapper.writeValue(resp.getWriter(), new Msg("Address, city, state, and postal code are required."));
                 return;
             }
 
@@ -115,6 +126,11 @@ public class AuthServlet extends HttpServlet {
                 body.fullName = fullName;
                 body.email = email;
                 body.phone = phone;
+                body.address = address;
+                body.address2 = address2;
+                body.city = city;
+                body.state = state;
+                body.postalCode = postalCode;
                 SafeUser updated = updateProfile(uid, body);
                 if (updated == null) {
                     resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -213,7 +229,7 @@ public class AuthServlet extends HttpServlet {
 
             try (Connection conn = DatabaseConnection.getConnection(getServletContext());
                     PreparedStatement ps = conn.prepareStatement(
-                            "SELECT user_id, role, full_name, email, phone, password_hash FROM users WHERE email = ?")) {
+                            "SELECT user_id, role, full_name, email, phone, address, address2, city, state, postal_code, password_hash FROM users WHERE email = ?")) {
                 ps.setString(1, body.email.trim());
                 String origin = req.getRemoteAddr();
                 System.out.println("Login attempt from " + origin + " for email: " + body.email);
@@ -230,6 +246,11 @@ public class AuthServlet extends HttpServlet {
                     String fullName = rs.getString("full_name");
                     String email = rs.getString("email");
                     String phone = rs.getString("phone");
+                    String address = rs.getString("address");
+                    String address2 = rs.getString("address2");
+                    String city = rs.getString("city");
+                    String state = rs.getString("state");
+                    String postal = rs.getString("postal_code");
                     String hash = rs.getString("password_hash");
 
                     if (!UserDAO.passwordMatches(body.password, hash)) {
@@ -249,8 +270,20 @@ public class AuthServlet extends HttpServlet {
                             role,
                             fullName,
                             email,
-                            phone);
-                    CartAttachResult cartResult = attachAnonymousCartToUser(resolveCartToken(req), u.userId);
+                            phone,
+                            address,
+                            address2,
+                            city,
+                            state,
+                            postal);
+                    CartAttachResult cartResult = null;
+                    try {
+                        cartResult = attachAnonymousCartToUser(resolveCartToken(req), u.userId);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                        // Do not fail login if cart merge/attachment has issues
+                        cartResult = null;
+                    }
 
                     Map<String, Object> responseBody = new HashMap<>();
                     responseBody.put("user", u);
@@ -263,6 +296,7 @@ public class AuthServlet extends HttpServlet {
                     mapper.writeValue(resp.getWriter(), responseBody);
                 }
             } catch (SQLException e) {
+                e.printStackTrace();
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 mapper.writeValue(resp.getWriter(), new Msg("error"));
             }
@@ -291,6 +325,12 @@ public class AuthServlet extends HttpServlet {
                     phone = p.trim().isEmpty() ? null : p.trim();
                 }
 
+                String address = root.hasNonNull("address") ? root.get("address").asText() : null;
+                String address2 = root.hasNonNull("address2") ? root.get("address2").asText() : null;
+                String city = root.hasNonNull("city") ? root.get("city").asText() : null;
+                String state = root.hasNonNull("state") ? root.get("state").asText() : null;
+                String postalCode = root.hasNonNull("postalCode") ? root.get("postalCode").asText() : null;
+
                 String role = null;
                 if (root.hasNonNull("role"))
                     role = root.get("role").asText();
@@ -303,6 +343,12 @@ public class AuthServlet extends HttpServlet {
                     mapper.writeValue(resp.getWriter(), new Msg("invalid"));
                     return;
                 }
+                if (address == null || address.isBlank() || city == null || city.isBlank()
+                        || state == null || state.isBlank() || postalCode == null || postalCode.isBlank()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    mapper.writeValue(resp.getWriter(), new Msg("invalid_address"));
+                    return;
+                }
 
                 // Build User object manually
                 User user = new User();
@@ -310,6 +356,11 @@ public class AuthServlet extends HttpServlet {
                 user.setEmail(email.trim());
                 user.setPassword(password);
                 user.setPhone(phone);
+                user.setAddress(address.trim());
+                user.setAddress2(address2 != null ? address2.trim() : null);
+                user.setCity(city != null ? city.trim() : null);
+                user.setState(state != null ? state.trim() : null);
+                user.setPostalCode(postalCode != null ? postalCode.trim() : null);
                 if (role != null && !role.isBlank())
                     user.setRole(role);
 
@@ -341,7 +392,12 @@ public class AuthServlet extends HttpServlet {
                             user.getRole() != null ? user.getRole() : "customer",
                             user.getFullName(),
                             user.getEmail(),
-                            user.getPhone() // may be null
+                            user.getPhone(), // may be null
+                            user.getAddress(),
+                            user.getAddress2(),
+                            user.getCity(),
+                            user.getState(),
+                            user.getPostalCode()
                     );
 
                     resp.setStatus(HttpServletResponse.SC_CREATED);
@@ -602,6 +658,11 @@ public class AuthServlet extends HttpServlet {
         public String fullName;
         public String email;
         public String phone;
+        public String address;
+        public String address2;
+        public String city;
+        public String state;
+        public String postalCode;
     }
 
     public static class PasswordChangeBody {
@@ -644,13 +705,24 @@ public class AuthServlet extends HttpServlet {
         public String fullName;
         public String email;
         public String phone;
+        public String address;
+        public String address2;
+        public String city;
+        public String state;
+        public String postalCode;
 
-        public SafeUser(String userId, String role, String fullName, String email, String phone) {
+        public SafeUser(String userId, String role, String fullName, String email, String phone,
+                        String address, String address2, String city, String state, String postalCode) {
             this.userId = userId;
             this.role = role;
             this.fullName = fullName;
             this.email = email;
             this.phone = phone;
+            this.address = address;
+            this.address2 = address2;
+            this.city = city;
+            this.state = state;
+            this.postalCode = postalCode;
         }
     }
 
@@ -659,7 +731,8 @@ public class AuthServlet extends HttpServlet {
         User user = dao.getUserById(userId);
         if (user == null)
             return null;
-        return new SafeUser(user.getUserId(), user.getRole(), user.getFullName(), user.getEmail(), user.getPhone());
+        return new SafeUser(user.getUserId(), user.getRole(), user.getFullName(), user.getEmail(), user.getPhone(),
+                user.getAddress(), user.getAddress2(), user.getCity(), user.getState(), user.getPostalCode());
     }
 
     SafeUser updateProfile(String userId, ProfileUpdateBody body) throws SQLException {
@@ -671,13 +744,20 @@ public class AuthServlet extends HttpServlet {
         existing.setFullName(body.fullName.trim());
         existing.setEmail(body.email.trim());
         existing.setPhone(body.phone != null ? body.phone.trim() : null);
+        existing.setAddress(body.address);
+        existing.setAddress2(body.address2);
+        existing.setCity(body.city);
+        existing.setState(body.state);
+        existing.setPostalCode(body.postalCode);
 
         boolean ok = dao.updateProfile(existing.getUserId(), existing.getFullName(), existing.getEmail(),
-                existing.getPhone());
+                existing.getPhone(), existing.getAddress(), existing.getAddress2(), existing.getCity(),
+                existing.getState(), existing.getPostalCode());
         if (!ok)
             return null;
         return new SafeUser(existing.getUserId(), existing.getRole(), existing.getFullName(), existing.getEmail(),
-                existing.getPhone());
+                existing.getPhone(), existing.getAddress(), existing.getAddress2(), existing.getCity(),
+                existing.getState(), existing.getPostalCode());
     }
 
     boolean updatePassword(String userId, PasswordChangeBody body) throws SQLException {

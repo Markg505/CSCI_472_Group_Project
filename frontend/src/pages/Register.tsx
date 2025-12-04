@@ -6,6 +6,11 @@ type FormData = {
   fullName: string;
   email: string;
   phone?: string;
+  address: string;
+  address2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
   password: string;
   confirm: string;
 };
@@ -49,6 +54,11 @@ const onSubmit = async (v: FormData) => {
     email: v.email?.trim().toLowerCase(),
     password: v.password,
     ...(v.phone?.trim() ? { phone: v.phone.trim() } : {}),
+    address: v.address.trim(),
+    address2: v.address2?.trim() ?? "",
+    city: v.city.trim(),
+    state: v.state.trim(),
+    postalCode: v.postalCode.trim(),
   };
 
   console.log("DEBUG payload:", payload);
@@ -79,7 +89,7 @@ const onSubmit = async (v: FormData) => {
                 minLength: { value: 2, message: "Too short" },
               })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
-              placeholder="Jane Doe"
+              placeholder="Name"
             />
             {errors.fullName && (
               <p className="mt-1 text-xs text-red-400">{errors.fullName.message}</p>
@@ -117,6 +127,70 @@ const onSubmit = async (v: FormData) => {
             />
             {errors.phone && (
               <p className="mt-1 text-xs text-red-400">{errors.phone.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm text-mute mb-1">Street address</label>
+            <input
+              type="text"
+              {...register("address", { required: "Address is required" })}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+              placeholder="123 Main St"
+            />
+            {errors.address && (
+              <p className="mt-1 text-xs text-red-400">{errors.address.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm text-mute mb-1">Address line 2 (optional)</label>
+            <input
+              type="text"
+              {...register("address2")}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+              placeholder="Apt / Suite"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-mute mb-1">City</label>
+              <input
+                type="text"
+                {...register("city", { required: "City is required" })}
+                className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+                placeholder="Springfield"
+              />
+              {errors.city && (
+                <p className="mt-1 text-xs text-red-400">{errors.city.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-mute mb-1">State</label>
+              <input
+                type="text"
+                {...register("state", { required: "State is required" })}
+                className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+                placeholder="CA"
+              />
+              {errors.state && (
+                <p className="mt-1 text-xs text-red-400">{errors.state.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-mute mb-1">Postal code</label>
+            <input
+              type="text"
+              {...register("postalCode", { required: "Postal code is required" })}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
+              placeholder="90210"
+            />
+            {errors.postalCode && (
+              <p className="mt-1 text-xs text-red-400">{errors.postalCode.message}</p>
             )}
           </div>
 

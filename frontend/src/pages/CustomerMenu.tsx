@@ -4,6 +4,8 @@ import { useNotifications } from "../features/notifications/NotificationContext"
 import { apiClient, type MenuItemWithInventory } from "../api/client";
 
 type Dietary = "veg" | "vegan" | "gf" | "spicy";
+type ModifierChoice = { id: string; label: string; price?: number };
+type ModifierGroup = { id: string; name: string; required?: boolean; choices: ModifierChoice[] };
 
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=1200&auto=format&fit=crop";
 
@@ -75,7 +77,6 @@ export default function MenuPage() {
         setMenuItems(items);
       } catch (error) {
         console.error('Error loading menu items:', error);
-        // Fallback to basic menu items if with-inventory fails
         const basicItems = await apiClient.getActiveMenuItems();
         setMenuItems(basicItems as MenuItemWithInventory[]);
       } finally {
@@ -85,7 +86,7 @@ export default function MenuPage() {
     loadMenuItems();
   }, []);
 
-  const addToCart = (menuItem: MenuItemWithInventory, customNotes?: string) => {
+  const addToCart = (menuItem: MenuItemWithInventory, customNotes?: string, modifiers?: ModifierChoice[]) => {
     dispatch({
       type: 'ADD_ITEM',
       payload: {
@@ -94,11 +95,10 @@ export default function MenuPage() {
         price: menuItem.price,
         imageUrl: menuItem.imageUrl,
         dietaryTags: menuItem.dietaryTags,
-        notes: customNotes
+        notes: buildNotes(customNotes, modifiers)
       }
     });
 
-    // Show success notification
     addNotification({
       type: 'success',
       title: 'Added to cart',
@@ -111,6 +111,62 @@ export default function MenuPage() {
     setItemWithNotes(null);
     setNotes("");
   };
+
+  function buildNotes(customNotes?: string, modifiers?: ModifierChoice[]) {
+    const mods = (modifiers ?? []).map(m => `${m.label}${m.price ? ` (+$${m.price.toFixed(2)})` : ''}`);
+    const parts: string[] = [];
+    if (mods.length) parts.push(`Mods: ${mods.join(', ')}`);
+    if (customNotes?.trim()) parts.push(customNotes.trim());
+    return parts.join(' | ');
+  }
+
+  const DEFAULT_MODIFIERS: Record<string, ModifierGroup[]> = {
+    Pizza: [
+      { id: 'size', name: 'Size', required: true, choices: [
+        { id: 'sm', label: 'Small', price: 0 },
+        { id: 'lg', label: 'Large', price: 3 }
+      ]},
+      { id: 'extras', name: 'Extras', choices: [
+        { id: 'cheese', label: 'Extra cheese', price: 1.5 },
+        { id: 'pep', label: 'Pepperoni', price: 2 }
+      ]}
+    ],
+    Salad: [
+      { id: 'dressing', name: 'Dressing', required: true, choices: [
+        { id: 'ranch', label: 'Ranch' },
+        { id: 'vin', label: 'Vinaigrette' }
+      ]}
+    ]
+  };
+
+  const [selectedMods, setSelectedMods] = useState<Record<string, Set<string>>>({});
+
+  function toggleModifier(itemId: string, group: ModifierGroup, choice: ModifierChoice) {
+    setSelectedMods(prev => {
+      const next: Record<string, Set<string>> = { ...prev };
+      const key = `${itemId}:${group.id}`;
+      const current = new Set<string>(Array.from(next[key] ?? [] as Set<string> | string[]));
+      if (group.required) {
+        current.clear();
+        current.add(choice.id);
+      } else {
+        current.has(choice.id) ? current.delete(choice.id) : current.add(choice.id);
+      }
+      next[key] = current;
+      return next;
+    });
+  }
+
+  function selectedChoicesFor(itemId: string, group: ModifierGroup): ModifierChoice[] {
+    const key = `${itemId}:${group.id}`;
+    const ids = selectedMods[key];
+    return group.choices.filter(c => ids?.has(c.id));
+  }
+
+  function requiredModsComplete(item: MenuItemWithInventory & { id: string }) {
+    const groups = DEFAULT_MODIFIERS[item.category] ?? [];
+    return groups.every(g => !g.required || selectedChoicesFor(item.id, g).length > 0);
+  }
 
   const enhancedMenu = useMemo(() => {
     return menuItems.map(item => {
@@ -299,6 +355,34 @@ export default function MenuPage() {
                       {d.description}
                     </p>
 
+                    {/* Modifiers */}
+                    {(DEFAULT_MODIFIERS[d.category] ?? []).map(group => (
+                      <div key={group.id} className="mt-3 border border-white/10 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-mute">{group.name}{group.required ? ' *' : ''}</p>
+                          {group.required && (
+                            <span className="text-xs text-amber-400">Choose one</span>
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {group.choices.map(choice => {
+                            const selected = selectedMods[`${d.id}:${group.id}`]?.has(choice.id);
+                            return (
+                              <button
+                                key={choice.id}
+                                onClick={() => toggleModifier(d.id, group, choice)}
+                                className={`px-3 py-1 rounded-full border text-xs ${
+                                  selected ? 'border-gold text-gold' : 'border-white/10 text-white/70'
+                                }`}
+                              >
+                                {choice.label}{choice.price ? ` (+$${choice.price.toFixed(2)})` : ''}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
                     <div className="mt-4 flex flex-wrap gap-2">
                       {(d.dietary ?? []).map((t) => (
                         <span key={t} className="tag">
@@ -312,7 +396,12 @@ export default function MenuPage() {
                         <div className="flex items-center justify-between gap-2">
                           <button
                             className="btn-primary rounded-xl px-4 py-2 flex-1"
-                            onClick={() => addToCart(d)}
+                            onClick={() => {
+                              const mods = (DEFAULT_MODIFIERS[d.category] ?? []).flatMap(g => selectedChoicesFor(d.id, g));
+                              const modCost = mods.reduce((sum, m) => sum + (m.price ?? 0), 0);
+                              addToCart({ ...d, price: d.price + modCost } as any, undefined, mods);
+                            }}
+                            disabled={!requiredModsComplete(d)}
                           >
                             Add to order
                           </button>
@@ -338,7 +427,14 @@ export default function MenuPage() {
                           <div className="flex gap-2">
                             <button
                               className="btn-primary rounded-xl px-4 py-2 flex-1 text-sm"
-                              onClick={() => handleAddWithNotes(d)}
+                              onClick={() => {
+                                const mods = (DEFAULT_MODIFIERS[d.category] ?? []).flatMap(g => selectedChoicesFor(d.id, g));
+                                const modCost = mods.reduce((sum, m) => sum + (m.price ?? 0), 0);
+                                addToCart({ ...d, price: d.price + modCost } as any, notes, mods);
+                                setItemWithNotes(null);
+                                setNotes("");
+                              }}
+                              disabled={!requiredModsComplete(d)}
                             >
                               Add with notes
                             </button>

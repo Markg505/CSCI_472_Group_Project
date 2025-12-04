@@ -1,4 +1,3 @@
-// src/.../AdminShell.tsx
 import {
   Disclosure, DisclosureButton, DisclosurePanel,
 } from "@headlessui/react";
@@ -28,8 +27,8 @@ function cx(...cls: Array<string | false | null | undefined>) {
 export default function AdminShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const role = (user?.role ?? "").toLowerCase();
 
-  // display name fallback
   const displayName = (user?.fullName ?? (user as any)?.fullName ?? user?.email) || "Admin";
 
   const handleSignOut = async () => {
@@ -40,12 +39,10 @@ export default function AdminShell() {
     }
   };
 
-  // simple avatar fallback 
   const imageUrl = (user && (user as any).imageUrl) || "https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500";
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Top dark nav */}
       <Disclosure as="nav" className="bg-slate-900/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
@@ -57,7 +54,9 @@ export default function AdminShell() {
               />
               <div className="hidden md:block">
                 <div className="flex items-baseline gap-1">
-                  {nav.map((item) => (
+                  {nav
+                    .filter(item => item.name !== "Users" || role === "admin")
+                    .map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}
@@ -102,7 +101,9 @@ export default function AdminShell() {
         {/* Mobile menu */}
         <DisclosurePanel className="md:hidden">
           <div className="space-y-1 px-2 pt-2 pb-3 sm:px-3">
-            {nav.map((item) => (
+            {nav
+              .filter(item => item.name !== "Users" || role === "admin")
+              .map((item) => (
               <DisclosureButton
                 key={item.to}
                 as={NavLink}

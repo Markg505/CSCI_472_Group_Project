@@ -1,4 +1,3 @@
-// src/App.tsx
 import { Outlet } from "react-router-dom";
 import { CartProvider } from "./features/cart/CartContext";
 import { NotificationProvider } from "./features/notifications/NotificationContext";

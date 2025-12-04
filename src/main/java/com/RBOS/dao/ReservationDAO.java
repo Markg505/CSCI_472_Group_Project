@@ -9,6 +9,10 @@ import jakarta.servlet.ServletContext;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class ReservationDAO {
     private ServletContext context;
@@ -189,13 +193,50 @@ public class ReservationDAO {
         return new PagedResult<>(reservations, total);
     }
 
+    private String generateNumericId() {
+        long n = java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L);
+        return Long.toString(n);
+    }
+
+    public boolean isTableAvailable(String tableId, String startUtc, String endUtc, String excludeReservationId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM reservations " +
+                "WHERE table_id = ? " +
+                "AND status IN ('pending','confirmed') " +
+                "AND NOT (end_utc <= ? OR start_utc >= ?)";
+
+        if (excludeReservationId != null) {
+            sql += " AND reservation_id <> ?";
+        }
+
+        try (Connection conn = DatabaseConnection.getConnection(context);
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, tableId);
+            pstmt.setString(2, startUtc);
+            pstmt.setString(3, endUtc);
+            if (excludeReservationId != null) {
+                pstmt.setString(4, excludeReservationId);
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) == 0;
+                }
+            }
+        }
+        return false;
+    }
+
     public String createReservation(Reservation reservation) throws SQLException {
         String reservationId = reservation.getReservationId() != null
                 ? reservation.getReservationId()
-                : java.util.UUID.randomUUID().toString();
-        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, table_id, start_utc, end_utc, party_size, status, notes) "
+                : generateNumericId();
+        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, contact_email, contact_phone, table_id, start_utc, end_utc, party_size, status, notes) "
                 +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        if (!isTableAvailable(reservation.getTableId(), reservation.getStartUtc(), reservation.getEndUtc(), null)) {
+            return null;
+        }
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -203,12 +244,14 @@ public class ReservationDAO {
             pstmt.setString(1, reservationId);
             pstmt.setString(2, reservation.getUserId());
             pstmt.setString(3, reservation.getGuestName());
-            pstmt.setString(4, reservation.getTableId());
-            pstmt.setString(5, reservation.getStartUtc());
-            pstmt.setString(6, reservation.getEndUtc());
-            pstmt.setInt(7, reservation.getPartySize());
-            pstmt.setString(8, reservation.getStatus() != null ? reservation.getStatus() : "pending");
-            pstmt.setString(9, reservation.getNotes());
+            pstmt.setString(4, reservation.getContactEmail());
+            pstmt.setString(5, reservation.getContactPhone());
+            pstmt.setString(6, reservation.getTableId());
+            pstmt.setString(7, reservation.getStartUtc());
+            pstmt.setString(8, reservation.getEndUtc());
+            pstmt.setInt(9, reservation.getPartySize());
+            pstmt.setString(10, reservation.getStatus() != null ? reservation.getStatus() : "pending");
+            pstmt.setString(11, reservation.getNotes());
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -221,17 +264,22 @@ public class ReservationDAO {
 
                         // Get email from user (you're logged in)
                         String userEmail = getUserEmailById(reservation.getUserId());
-                        if (userEmail != null && !userEmail.isEmpty()) {
+                        String targetEmail = (userEmail != null && !userEmail.isEmpty())
+                                ? userEmail
+                                : (reservation.getContactEmail() != null && !reservation.getContactEmail().isBlank()
+                                        ? reservation.getContactEmail()
+                                        : null);
+                        if (targetEmail != null && !targetEmail.isEmpty()) {
                             String emailBody = EmailTemplates.getReservationConfirmationTemplate(
                                     reservation.getGuestName() != null ? reservation.getGuestName() : "Valued Guest",
-                                    reservation.getStartUtc(),
-                                    reservation.getStartUtc(),
+                                    formatLocalDate(reservation.getStartUtc()),
+                                    formatLocalTime(reservation.getStartUtc()),
                                     reservation.getPartySize(),
                                     "Table " + reservation.getTableId(),
                                     reservationId);
 
                             emailService.sendEmailAsync(
-                                    userEmail,
+                                    targetEmail,
                                     "Reservation Confirmed - " + reservationId,
                                     emailBody);
                         }
@@ -250,6 +298,11 @@ public class ReservationDAO {
     public boolean updateReservation(Reservation reservation) throws SQLException {
         String sql = "UPDATE reservations SET user_id = ?, guest_name = ?, table_id = ?, start_utc = ?, end_utc = ?, " +
                 "party_size = ?, status = ?, notes = ? WHERE reservation_id = ?";
+
+        if (!isTableAvailable(reservation.getTableId(), reservation.getStartUtc(), reservation.getEndUtc(),
+                reservation.getReservationId())) {
+            return false;
+        }
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -289,8 +342,8 @@ public class ReservationDAO {
                             EmailService emailService = new EmailService();
                             String emailBody = EmailTemplates.getReservationUpdateTemplate(
                                     reservation.getGuestName(),
-                                    reservation.getStartUtc(),
-                                    reservation.getStartUtc(),
+                                    formatLocalDate(reservation.getStartUtc()),
+                                    formatLocalTime(reservation.getStartUtc()),
                                     status,
                                     reservationId);
                             emailService.sendEmailAsync(
@@ -331,6 +384,24 @@ public class ReservationDAO {
 
             pstmt.setString(1, reservationId);
             return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    private String formatLocalDate(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("MMMM dd, yyyy"));
+        } catch (Exception e) {
+            return isoInstant;
+        }
+    }
+
+    private String formatLocalTime(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("h:mm a z"));
+        } catch (Exception e) {
+            return isoInstant;
         }
     }
 }

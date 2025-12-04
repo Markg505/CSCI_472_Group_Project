@@ -1,5 +1,5 @@
 const BASE = (import.meta as any)?.env?.BASE_URL || '/';
-const API_BASE = `${BASE}api`;
+export const API_BASE = `${BASE}api`;
 
 const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
 const MAX_HISTORY_PAGE_SIZE = 100;
@@ -22,12 +22,17 @@ export interface DiningTable {
   tableId: string;
   name: string;
   capacity: number;
+  basePrice?: number;
+  posX?: number;
+  posY?: number;
 }
 
 export interface Reservation {
   reservationId?: string;
   userId?: string;
   guestName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   tableId: string;
   startUtc: string;
   endUtc: string;
@@ -91,6 +96,7 @@ export interface Inventory {
 
 export interface Order {
   orderId?: string;
+  orderNumber?: string;
   userId?: string;
   source: 'web' | 'phone' | 'walkin';
   status: 'cart' | 'placed' | 'paid' | 'cancelled';
@@ -102,6 +108,7 @@ export interface Order {
   orderItems?: OrderItem[];
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
   deliveryAddress?: string;
   deliveryAddress2?: string;
   deliveryCity?: string;
@@ -266,7 +273,6 @@ class ApiClient {
         localStorage.removeItem('rbos_cart_token');
       }
     } catch {
-      // ignore storage errors
     }
   }
 
@@ -365,6 +371,10 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
 
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
+  }
+
+  async getReservationById(reservationId: string): Promise<Reservation> {
+    return this.request(`/reservations/${encodeURIComponent(reservationId)}`);
   }
 
   async getReservationHistory(params: { status?: string; startUtc?: string; endUtc?: string; userId?: string; page?: number; pageSize?: number; }): Promise<HistoryResult<Reservation>> {
@@ -607,7 +617,6 @@ async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings>
   }
 }
 
-// Minimal CSV parser for audit log export (handles quoted commas)
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = '';

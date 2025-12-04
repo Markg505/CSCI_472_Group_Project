@@ -17,17 +17,21 @@ public class DiningTableDAO {
     public List<DiningTable> getAllTables() throws SQLException {
         List<DiningTable> tables = new ArrayList<>();
         String sql = "SELECT * FROM dining_tables ORDER BY table_id";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
-            
+
             while (rs.next()) {
-                tables.add(new DiningTable(
+                DiningTable table = new DiningTable(
                     rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
-                ));
+                );
+                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
+                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
+                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
+                tables.add(table);
             }
         }
         return tables;
@@ -35,19 +39,23 @@ public class DiningTableDAO {
     
     public DiningTable getTableById(String tableId) throws SQLException {
         String sql = "SELECT * FROM dining_tables WHERE table_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, tableId);
             ResultSet rs = pstmt.executeQuery();
-            
+
             if (rs.next()) {
-                return new DiningTable(
+                DiningTable table = new DiningTable(
                     rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
                 );
+                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
+                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
+                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
+                return table;
             }
         }
         return null;
@@ -62,9 +70,7 @@ public class DiningTableDAO {
                     "AND dt.table_id NOT IN (" +
                     "    SELECT r.table_id FROM reservations r " +
                     "    WHERE r.status IN ('pending', 'confirmed') " +
-                    "    AND ((r.start_utc < ? AND r.end_utc > ?) " +
-                    "         OR (r.start_utc < ? AND r.end_utc > ?) " +
-                    "         OR (r.start_utc >= ? AND r.end_utc <= ?))" +
+                    "    AND NOT (r.end_utc <= ? OR r.start_utc >= ?)" +
                     ") " +
                     "ORDER BY dt.capacity";
         
@@ -72,40 +78,54 @@ public class DiningTableDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
             pstmt.setInt(1, partySize);
-            // Set the same parameters multiple times for the overlapping conditions
-            pstmt.setString(2, endUtc);   // r.end_utc > startUtc (first condition)
-            pstmt.setString(3, startUtc);  // r.start_utc < endUtc (first condition)
-            pstmt.setString(4, endUtc);    // r.start_utc < endUtc (second condition)  
-            pstmt.setString(5, startUtc);  // r.end_utc > startUtc (second condition)
-            pstmt.setString(6, startUtc);  // r.start_utc >= startUtc (third condition)
-            pstmt.setString(7, endUtc);    // r.end_utc <= endUtc (third condition)
+            pstmt.setString(2, startUtc);
+            pstmt.setString(3, endUtc);
             
             ResultSet rs = pstmt.executeQuery();
-            
+
             while (rs.next()) {
-                tables.add(new DiningTable(
+                DiningTable table = new DiningTable(
                     rs.getString("table_id"),
                     rs.getString("name"),
                     rs.getInt("capacity")
-                ));
+                );
+                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
+                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
+                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
+                tables.add(table);
             }
         }
         return tables;
     }
-    
+
     public String createTable(DiningTable table) throws SQLException {
         String tableId = table.getTableId() != null ? table.getTableId() : java.util.UUID.randomUUID().toString();
-        String sql = "INSERT INTO dining_tables (table_id, name, capacity) VALUES (?, ?, ?)";
-        
+        String sql = "INSERT INTO dining_tables (table_id, name, capacity, base_price, pos_x, pos_y) VALUES (?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            
+
             pstmt.setString(1, tableId);
             pstmt.setString(2, table.getName());
             pstmt.setInt(3, table.getCapacity());
-            
+            if (table.getBasePrice() != null) {
+                pstmt.setDouble(4, table.getBasePrice());
+            } else {
+                pstmt.setNull(4, Types.REAL);
+            }
+            if (table.getPosX() != null) {
+                pstmt.setDouble(5, table.getPosX());
+            } else {
+                pstmt.setNull(5, Types.REAL);
+            }
+            if (table.getPosY() != null) {
+                pstmt.setDouble(6, table.getPosY());
+            } else {
+                pstmt.setNull(6, Types.REAL);
+            }
+
             int affectedRows = pstmt.executeUpdate();
-            
+
             if (affectedRows > 0) {
                 return tableId;
             }
@@ -114,15 +134,30 @@ public class DiningTableDAO {
     }
     
     public boolean updateTable(DiningTable table) throws SQLException {
-        String sql = "UPDATE dining_tables SET name = ?, capacity = ? WHERE table_id = ?";
-        
+        String sql = "UPDATE dining_tables SET name = ?, capacity = ?, base_price = ?, pos_x = ?, pos_y = ? WHERE table_id = ?";
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, table.getName());
             pstmt.setInt(2, table.getCapacity());
-            pstmt.setString(3, table.getTableId());
-            
+            if (table.getBasePrice() != null) {
+                pstmt.setDouble(3, table.getBasePrice());
+            } else {
+                pstmt.setNull(3, Types.REAL);
+            }
+            if (table.getPosX() != null) {
+                pstmt.setDouble(4, table.getPosX());
+            } else {
+                pstmt.setNull(4, Types.REAL);
+            }
+            if (table.getPosY() != null) {
+                pstmt.setDouble(5, table.getPosY());
+            } else {
+                pstmt.setNull(5, Types.REAL);
+            }
+            pstmt.setString(6, table.getTableId());
+
             return pstmt.executeUpdate() > 0;
         }
     }

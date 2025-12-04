@@ -21,6 +21,11 @@ export default function CustomerDashboard() {
     fullName: user?.fullName ?? "",
     email: user?.email ?? "",
     phone: (user as UserWithPhone)?.phone ?? "",
+    address: (user as any)?.address ?? "",
+    address2: (user as any)?.address2 ?? "",
+    city: (user as any)?.city ?? "",
+    state: (user as any)?.state ?? "",
+    postalCode: (user as any)?.postalCode ?? "",
   });
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -50,8 +55,13 @@ export default function CustomerDashboard() {
       fullName: user?.fullName ?? "",
       email: user?.email ?? "",
       phone: (user as UserWithPhone)?.phone ?? "",
+      address: (user as any)?.address ?? "",
+      address2: (user as any)?.address2 ?? "",
+      city: (user as any)?.city ?? "",
+      state: (user as any)?.state ?? "",
+      postalCode: (user as any)?.postalCode ?? "",
     });
-  }, [user?.fullName, user?.email, (user as UserWithPhone)?.phone]);
+  }, [user?.fullName, user?.email, (user as UserWithPhone)?.phone, (user as any)?.address, (user as any)?.address2, (user as any)?.city, (user as any)?.state, (user as any)?.postalCode]);
 
   useEffect(() => {
     if (!user?.userId) return;
@@ -121,12 +131,21 @@ export default function CustomerDashboard() {
       setProfileError("Full name and email are required.");
       return;
     }
+    if (!profileForm.address.trim() || !profileForm.city.trim() || !profileForm.state.trim() || !profileForm.postalCode.trim()) {
+      setProfileError("Address, city, state, and postal code are required.");
+      return;
+    }
 
     try {
       await updateProfile({
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         phone: profileForm.phone.trim(),
+        address: profileForm.address.trim(),
+        address2: profileForm.address2.trim(),
+        city: profileForm.city.trim(),
+        state: profileForm.state.trim(),
+        postalCode: profileForm.postalCode.trim(),
       });
       setProfileStatus("Profile updated successfully.");
     } catch (err) {
@@ -232,6 +251,7 @@ export default function CustomerDashboard() {
                 className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
                 value={profileForm.fullName}
                 onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+                required
               />
             </label>
             <label className="flex flex-col gap-1 text-sm text-mute">
@@ -240,6 +260,7 @@ export default function CustomerDashboard() {
                 className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
                 value={profileForm.email}
                 onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))}
+                required
               />
             </label>
             <label className="flex flex-col gap-1 text-sm text-mute">
@@ -254,6 +275,58 @@ export default function CustomerDashboard() {
               <p className="text-sm text-mute">Account Type</p>
               <p className="text-fg capitalize">{user?.role?.toLowerCase() || "N/A"}</p>
             </div>
+
+            <label className="flex flex-col gap-1 text-sm text-mute md:col-span-2">
+              Street address
+              <input
+                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                value={profileForm.address}
+                onChange={(e) => setProfileForm((p) => ({ ...p, address: e.target.value }))}
+                required
+                placeholder="123 Main St"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-mute md:col-span-2">
+              Address line 2 (optional)
+              <input
+                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                value={profileForm.address2}
+                onChange={(e) => setProfileForm((p) => ({ ...p, address2: e.target.value }))}
+                placeholder="Apt / Suite"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-mute">
+              City
+              <input
+                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                value={profileForm.city}
+                onChange={(e) => setProfileForm((p) => ({ ...p, city: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-mute">
+              State
+              <input
+                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                value={profileForm.state}
+                onChange={(e) => setProfileForm((p) => ({ ...p, state: e.target.value }))}
+                required
+                placeholder="CA"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-mute">
+              Postal code
+              <input
+                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                value={profileForm.postalCode}
+                onChange={(e) => setProfileForm((p) => ({ ...p, postalCode: e.target.value }))}
+                required
+                placeholder="90210"
+              />
+            </label>
+
             <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"

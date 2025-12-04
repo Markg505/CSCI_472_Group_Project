@@ -7,37 +7,15 @@ type FormData = { email: string; password: string };
 export default function AdminLoginPage() {
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<FormData>();
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { setUser, refreshProfile, loginWithCredentials } = useAuth();
 
   const onSubmit = async (v: FormData) => {
     try {
-      const res = await fetch("/RBOS/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          email: v.email.trim().toLowerCase(),
-          password: v.password,
-        }),
-      });
-
-      if (!res.ok) {
-        let msg = "Login failed";
-        try {
-          const j = await res.json();
-          if (j?.message) msg = j.message;
-        } catch { /* ignore */ }
-        throw new Error(msg);
-      }
-
-      // Get user profile
-      const meRes = await fetch("/RBOS/api/auth/me", { credentials: "include" });
-      if (!meRes.ok) {
+      await loginWithCredentials(v.email.trim().toLowerCase(), v.password);
+      const me = await refreshProfile();
+      if (!me) {
         throw new Error("Could not load user profile after login.");
       }
-
-      const me = await meRes.json();
-      
       // Verify user is admin or staff
       if (me.role !== 'admin' && me.role !== 'staff') {
         throw new Error("Unauthorized: Admin or staff access required");
@@ -74,7 +52,7 @@ export default function AdminLoginPage() {
               type="email"
               {...register("email", { required: true })}
               className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-gold"
-              placeholder="admin@rbos.com"
+              placeholder=""
               autoComplete="email"
             />
           </div>

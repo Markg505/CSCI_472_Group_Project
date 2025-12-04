@@ -550,10 +550,6 @@ function SalesReport({ data, period }: { data: SalesAnalytics; period: string })
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-700">Filters</h3>
-        <span className="text-sm text-gray-500">Use per-card filters below</span>
-      </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <div className="flex items-center justify-between mb-4">
@@ -927,8 +923,7 @@ function MenuReport({ data }: { data: MenuPerformance }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-700">Filters</h3>
+      <div className="flex items-center justify-end">
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
