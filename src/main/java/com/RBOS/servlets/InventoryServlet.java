@@ -30,7 +30,11 @@ public class InventoryServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         System.out.println("InventoryServlet doGet path=" + request.getPathInfo());
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 53100de (fixed all the stuff i broke trying to fix a merge)
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
@@ -76,11 +80,51 @@ public class InventoryServlet extends HttpServlet {
         }
     }
 
+    <<<<<<<HEAD=======
+
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         System.out.println("InventoryServlet doPost path=" + request.getPathInfo());
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        try {
+            Inventory inventory = objectMapper.readValue(request.getReader(), Inventory.class);
+            if (inventory.getInventoryId() == null || inventory.getInventoryId().isBlank()) {
+                inventory.setInventoryId(UUID.randomUUID().toString());
+            }
+            String newId = inventoryDAO.createInventory(inventory);
+            if (newId == null) {
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to create inventory");
+                return;
+            }
+            Inventory after = inventoryDAO.getInventoryById(newId);
+            logChange("inventory", newId, "create", null, after != null ? after : inventory, request);
+
+            response.setStatus(HttpServletResponse.SC_CREATED);
+            response.getWriter().write(objectMapper.writeValueAsString(after != null ? after : inventory));
+        } catch (SQLException e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            e.printStackTrace();
+        } catch (NumberFormatException e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
+    >>>>>>>53100de (fixed all the stuff i broke trying to fix a merge)
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+<<<<<<< HEAD
+        System.out.println("InventoryServlet doPost path=" + request.getPathInfo());
+
+=======
+        System.out.println("InventoryServlet doPut path=" + request.getPathInfo());
+        
+>>>>>>> 53100de (fixed all the stuff i broke trying to fix a merge)
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
@@ -154,7 +198,11 @@ public class InventoryServlet extends HttpServlet {
             String itemId = splits[2];
             String action = splits[3];
             Inventory before = inventoryDAO.getInventoryByItemId(itemId);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 53100de (fixed all the stuff i broke trying to fix a merge)
             if ("quantity".equals(action)) {
                 String quantityStr = request.getParameter("quantity");
                 if (quantityStr == null) {

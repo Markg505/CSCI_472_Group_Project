@@ -1,9 +1,15 @@
 package com.RBOS.dao;
 
+<<<<<<<HEAD
+
 import com.RBOS.models.MenuItem;
 import com.RBOS.models.MenuItemWithInventory;
 import com.RBOS.utils.DatabaseConnection;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;=======
+import com.RBOS.models.MenuItem;
+import com.RBOS.models.MenuItemWithInventory;
+import com.RBOS.utils.DatabaseConnection;
+import com.fasterxml.jackson.databind.ObjectMapper;>>>>>>>53100d e(fixed all the stuff i broke trying to fix a merge)
 import jakarta.servlet.ServletContext;
 import java.sql.*;
 import java.util.ArrayList;
@@ -11,142 +17,149 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+<<<<<<<HEAD
+
 public class MenuItemDAO {
     private ServletContext context;
     private AuditLogDAO auditLogDAO;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();=======
 
-    public MenuItemDAO(ServletContext context) {
-        this.context = context;
-        this.auditLogDAO = new AuditLogDAO(context);
-    }
+    public class MenuItemDAO {
+        private ServletContext context;
+        private AuditLogDAO auditLogDAO;
+        private final ObjectMapper objectMapper = new ObjectMapper();>>>>>>>53100de (fixed all the stuff i broke trying to fix a merge)
 
-    public List<MenuItem> getAllMenuItems() throws SQLException {
-        List<MenuItem> menuItems = new ArrayList<>();
-        String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock FROM menu_items ORDER BY item_id";
-
-        try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql);
-                ResultSet rs = pstmt.executeQuery()) {
-
-            while (rs.next()) {
-                boolean active = rs.getInt("active") == 1;
-                boolean outOfStock = rs.getInt("out_of_stock") == 1;
-                MenuItem item = new MenuItem(
-                        rs.getString("item_id"),
-                        rs.getString("name"),
-                        rs.getString("description"),
-                        rs.getString("category"),
-                        rs.getDouble("price"),
-                        active,
-                        rs.getString("image_url"),
-                        rs.getString("dietary_tags"));
-                item.setOutOfStock(outOfStock);
-                menuItems.add(item);
-            }
+        public MenuItemDAO(ServletContext context) {
+            this.context = context;
+            this.auditLogDAO = new AuditLogDAO(context);
         }
-        return menuItems;
-    }
 
-    public List<MenuItem> getActiveMenuItems() throws SQLException {
-        List<MenuItem> menuItems = new ArrayList<>();
-        String sql = "SELECT * FROM menu_items WHERE active = 1 ORDER BY item_id";
+        public List<MenuItem> getAllMenuItems() throws SQLException {
+            List<MenuItem> menuItems = new ArrayList<>();
+            String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock FROM menu_items ORDER BY item_id";
 
-        try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql);
-                ResultSet rs = pstmt.executeQuery()) {
+            try (Connection conn = DatabaseConnection.getConnection(context);
+                    PreparedStatement pstmt = conn.prepareStatement(sql);
+                    ResultSet rs = pstmt.executeQuery()) {
 
-            while (rs.next()) {
-                boolean active = rs.getInt("active") == 1;
-                boolean outOfStock = rs.getInt("out_of_stock") == 1;
-                MenuItem item = new MenuItem(
-                        rs.getString("item_id"),
-                        rs.getString("name"),
-                        rs.getString("description"),
-                        rs.getString("category"),
-                        rs.getDouble("price"),
-                        active,
-                        rs.getString("image_url"),
-                        rs.getString("dietary_tags"));
-                item.setOutOfStock(outOfStock);
-                menuItems.add(item);
+                while (rs.next()) {
+                    boolean active = rs.getInt("active") == 1;
+                    boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                    MenuItem item = new MenuItem(
+                            rs.getString("item_id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("category"),
+                            rs.getDouble("price"),
+                            active,
+                            rs.getString("image_url"),
+                            rs.getString("dietary_tags"));
+                    item.setOutOfStock(outOfStock);
+                    menuItems.add(item);
+                }
             }
+            return menuItems;
         }
-        return menuItems;
-    }
 
-    public MenuItem getMenuItemById(String itemId) throws SQLException {
-        String sql = "SELECT * FROM menu_items WHERE item_id = ?";
+        public List<MenuItem> getActiveMenuItems() throws SQLException {
+            List<MenuItem> menuItems = new ArrayList<>();
+            String sql = "SELECT * FROM menu_items WHERE active = 1 ORDER BY item_id";
 
-        try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            try (Connection conn = DatabaseConnection.getConnection(context);
+                    PreparedStatement pstmt = conn.prepareStatement(sql);
+                    ResultSet rs = pstmt.executeQuery()) {
 
-            pstmt.setString(1, itemId);
-            ResultSet rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                boolean active = rs.getInt("active") == 1;
-                boolean outOfStock = rs.getInt("out_of_stock") == 1;
-                MenuItem item = new MenuItem(
-                        rs.getString("item_id"),
-                        rs.getString("name"),
-                        rs.getString("description"),
-                        rs.getString("category"),
-                        rs.getDouble("price"),
-                        active,
-                        rs.getString("image_url"),
-                        rs.getString("dietary_tags"));
-                item.setOutOfStock(outOfStock);
-                return item;
+                while (rs.next()) {
+                    boolean active = rs.getInt("active") == 1;
+                    boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                    MenuItem item = new MenuItem(
+                            rs.getString("item_id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("category"),
+                            rs.getDouble("price"),
+                            active,
+                            rs.getString("image_url"),
+                            rs.getString("dietary_tags"));
+                    item.setOutOfStock(outOfStock);
+                    menuItems.add(item);
+                }
             }
+            return menuItems;
         }
-        return null;
-    }
 
-    public List<MenuItemWithInventory> getActiveMenuItemsWithInventory() throws SQLException {
-        List<MenuItemWithInventory> menuItems = new ArrayList<>();
-        String sql = "SELECT m.*, i.qty_on_hand, i.par_level, i.reorder_point, " +
-                "CASE WHEN i.qty_on_hand > 0 THEN 1 ELSE 0 END as available " +
-                "FROM menu_items m " +
-                "LEFT JOIN inventory i ON m.item_id = i.item_id " +
-                "WHERE m.active = 1 " +
-                "ORDER BY m.item_id";
+        public MenuItem getMenuItemById(String itemId) throws SQLException {
+            String sql = "SELECT * FROM menu_items WHERE item_id = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql);
-                ResultSet rs = pstmt.executeQuery()) {
+            try (Connection conn = DatabaseConnection.getConnection(context);
+                    PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            while (rs.next()) {
-                boolean active = rs.getInt("active") == 1;
-                boolean outOfStock = rs.getInt("out_of_stock") == 1;
-                MenuItemWithInventory item = new MenuItemWithInventory(
-                        rs.getString("item_id"),
-                        rs.getString("name"),
-                        rs.getString("description"),
-                        rs.getString("category"),
-                        rs.getDouble("price"),
-                        active,
-                        rs.getString("image_url"),
-                        rs.getString("dietary_tags"));
+                pstmt.setString(1, itemId);
+                ResultSet rs = pstmt.executeQuery();
 
-                boolean available = rs.getInt("available") == 1;
-
-                // Set inventory info
-                item.setQtyOnHand(rs.getInt("qty_on_hand"));
-                item.setParLevel(rs.getInt("par_level"));
-                item.setReorderPoint(rs.getInt("reorder_point"));
-                item.setAvailable(available && !outOfStock); // Not available if marked out of stock
-                item.setOutOfStock(outOfStock);
-                menuItems.add(item);
+                if (rs.next()) {
+                    boolean active = rs.getInt("active") == 1;
+                    boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                    MenuItem item = new MenuItem(
+                            rs.getString("item_id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("category"),
+                            rs.getDouble("price"),
+                            active,
+                            rs.getString("image_url"),
+                            rs.getString("dietary_tags"));
+                    item.setOutOfStock(outOfStock);
+                    return item;
+                }
             }
+            return null;
         }
-        return menuItems;
-    }
 
-    // Backward compatible version without audit logging
-    public String createMenuItem(MenuItem menuItem) throws SQLException {
-        return createMenuItem(menuItem, null, null);
-    }
+        public List<MenuItemWithInventory> getActiveMenuItemsWithInventory() throws SQLException {
+            List<MenuItemWithInventory> menuItems = new ArrayList<>();
+            String sql = "SELECT m.*, i.qty_on_hand, i.par_level, i.reorder_point, " +
+                    "CASE WHEN i.qty_on_hand > 0 THEN 1 ELSE 0 END as available " +
+                    "FROM menu_items m " +
+                    "LEFT JOIN inventory i ON m.item_id = i.item_id " +
+                    "WHERE m.active = 1 " +
+                    "ORDER BY m.item_id";
+
+            try (Connection conn = DatabaseConnection.getConnection(context);
+                    PreparedStatement pstmt = conn.prepareStatement(sql);
+                    ResultSet rs = pstmt.executeQuery()) {
+
+                while (rs.next()) {
+                    boolean active = rs.getInt("active") == 1;
+                    boolean outOfStock = rs.getInt("out_of_stock") == 1;
+                    MenuItemWithInventory item = new MenuItemWithInventory(
+                            rs.getString("item_id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("category"),
+                            rs.getDouble("price"),
+                            active,
+                            rs.getString("image_url"),
+                            rs.getString("dietary_tags"));
+
+                    boolean available = rs.getInt("available") == 1;
+
+                    // Set inventory info
+                    item.setQtyOnHand(rs.getInt("qty_on_hand"));
+                    item.setParLevel(rs.getInt("par_level"));
+                    item.setReorderPoint(rs.getInt("reorder_point"));
+                    item.setAvailable(available && !outOfStock); // Not available if marked out of stock
+                    item.setOutOfStock(outOfStock);
+                    menuItems.add(item);
+                }
+            }
+            return menuItems;
+        }
+
+        // Backward compatible version without audit logging
+        public String createMenuItem(MenuItem menuItem) throws SQLException {
+            return createMenuItem(menuItem, null, null);
+        }
 
     public String createMenuItem(MenuItem menuItem, String userId, String userName) throws SQLException {
         String itemId = menuItem.getItemId();
@@ -174,6 +187,7 @@ public class MenuItemDAO {
             int affectedRows = pstmt.executeUpdate();
 
             if (affectedRows > 0) {
+<<<<<<< HEAD
                 // Log the creation
                 if (userId != null && userName != null) {
                     Map<String, Object> newValues = new HashMap<>();
@@ -193,6 +207,27 @@ public class MenuItemDAO {
                 return itemId;
             }
         }
+=======
+                // Log the creation
+                if (userId != null && userName != null) {
+                    Map<String, Object> newValues = new HashMap<>();
+                    newValues.put("name", menuItem.getName());
+                    newValues.put("price", menuItem.getPrice());
+                    newValues.put("category", menuItem.getCategory());
+                    newValues.put("active", menuItem.getActive());
+                    auditLogDAO.log(
+                            "menu_item",
+                            itemId,
+                            "create",
+                            userId,
+                            userName,
+                            null,
+                            objectToJson(newValues)
+                    );
+                }
+                return itemId;
+            }
+    }>>>>>>>53100de (fixed all the stuff i broke trying to fix a merge)
         return null;
     }
 
@@ -239,6 +274,7 @@ public class MenuItemDAO {
                 newValues.put("active", menuItem.getActive());
                 newValues.put("outOfStock", menuItem.getOutOfStock());
 
+<<<<<<< HEAD
                 auditLogDAO.log(
                         "menu_item",
                         menuItem.getItemId(),
@@ -250,7 +286,22 @@ public class MenuItemDAO {
             }
 
             return success;
+=======
+                auditLogDAO.log(
+                        "menu_item",
+                        menuItem.getItemId(),
+                        "update",
+                        userId,
+                        userName,
+                        objectToJson(oldValues),
+                        objectToJson(newValues)
+                );
+            }
+
+            return success;
+>>>>>>> 53100de (fixed all the stuff i broke trying to fix a merge)
         }
+
     }
 
     // Backward compatible version without audit logging
