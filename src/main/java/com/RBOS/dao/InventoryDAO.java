@@ -14,6 +14,25 @@ public class InventoryDAO {
         this.context = context;
     }
 
+    public Inventory getInventoryById(String inventoryId) throws SQLException {
+        String sql = "SELECT i.*, m.name as menu_item_name, m.price as menu_item_price " +
+                "FROM inventory i " +
+                "LEFT JOIN menu_items m ON i.item_id = m.item_id " +
+                "WHERE i.inventory_id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, inventoryId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToInventory(rs);
+            }
+        }
+        return null;
+    }
+
     public List<Inventory> getAllInventory() throws SQLException {
         List<Inventory> inventoryList = new ArrayList<>();
         String sql = "SELECT i.*, m.name as menu_item_name, m.price as menu_item_price " +
@@ -187,59 +206,60 @@ public class InventoryDAO {
         return lowStockList;
     }
 
-    public Integer createInventory(Inventory inventory) throws SQLException {
-        String sql = "INSERT INTO inventory (item_id, name, sku, category, unit, pack_size, " +
+    public String createInventory(Inventory inventory) throws SQLException {
+        String inventoryId = inventory.getInventoryId();
+        if (inventoryId == null || inventoryId.isBlank()) {
+            inventoryId = java.util.UUID.randomUUID().toString();
+            inventory.setInventoryId(inventoryId);
+        }
+
+        String sql = "INSERT INTO inventory (inventory_id, item_id, name, sku, category, unit, pack_size, " +
                 "qty_on_hand, par_level, reorder_point, cost, location, active, vendor, " +
                 "lead_time_days, preferred_order_qty, waste_qty, last_counted_at, count_freq, " +
                 "lot, expiry_date, allergen, conversion) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            setInventoryPreparedStatement(pstmt, inventory);
+            pstmt.setString(1, inventoryId);
+            setInventoryPreparedStatement(pstmt, inventory, 2);
 
-            int affectedRows = pstmt.executeUpdate();
-
-            if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
-                    }
-                }
+            if (pstmt.executeUpdate() > 0) {
+                return inventoryId;
             }
         }
         return null;
     }
 
-    private void setInventoryPreparedStatement(PreparedStatement pstmt, Inventory inventory) throws SQLException {
-        pstmt.setString(1, inventory.getItemId());
-        pstmt.setString(2, inventory.getName());
-        pstmt.setString(3, inventory.getSku());
-        pstmt.setString(4, inventory.getCategory());
-        pstmt.setString(5, inventory.getUnit() != null ? inventory.getUnit().name() : Unit.each.name());
-        pstmt.setInt(6, inventory.getPackSize() != null ? inventory.getPackSize() : 1);
-        pstmt.setInt(7, inventory.getQtyOnHand() != null ? inventory.getQtyOnHand() : 0);
-        pstmt.setInt(8, inventory.getParLevel() != null ? inventory.getParLevel() : 0);
-        pstmt.setInt(9, inventory.getReorderPoint() != null ? inventory.getReorderPoint() : 0);
-        pstmt.setDouble(10, inventory.getCost() != null ? inventory.getCost() : 0.0);
-        pstmt.setString(11, inventory.getLocation());
-        pstmt.setBoolean(12, inventory.getActive() != null ? inventory.getActive() : true);
-        pstmt.setString(13, inventory.getVendor());
-        pstmt.setInt(14, inventory.getLeadTimeDays() != null ? inventory.getLeadTimeDays() : 0);
-        pstmt.setInt(15, inventory.getPreferredOrderQty() != null ? inventory.getPreferredOrderQty() : 0);
-        pstmt.setInt(16, inventory.getWasteQty() != null ? inventory.getWasteQty() : 0);
-        pstmt.setString(17, inventory.getLastCountedAt());
-        pstmt.setString(18, inventory.getCountFreq() != null ? inventory.getCountFreq().name() : CountFreq.weekly.name());
-        pstmt.setString(19, inventory.getLot());
-        pstmt.setString(20, inventory.getExpiryDate());
-        pstmt.setString(21, inventory.getAllergen() != null ? inventory.getAllergen().name() : Allergen.none.name());
-        pstmt.setString(22, inventory.getConversion());
+    private void setInventoryPreparedStatement(PreparedStatement pstmt, Inventory inventory, int startIndex) throws SQLException {
+        pstmt.setString(startIndex, inventory.getItemId());
+        pstmt.setString(startIndex + 1, inventory.getName());
+        pstmt.setString(startIndex + 2, inventory.getSku());
+        pstmt.setString(startIndex + 3, inventory.getCategory());
+        pstmt.setString(startIndex + 4, inventory.getUnit() != null ? inventory.getUnit().name() : Unit.each.name());
+        pstmt.setInt(startIndex + 5, inventory.getPackSize() != null ? inventory.getPackSize() : 1);
+        pstmt.setInt(startIndex + 6, inventory.getQtyOnHand() != null ? inventory.getQtyOnHand() : 0);
+        pstmt.setInt(startIndex + 7, inventory.getParLevel() != null ? inventory.getParLevel() : 0);
+        pstmt.setInt(startIndex + 8, inventory.getReorderPoint() != null ? inventory.getReorderPoint() : 0);
+        pstmt.setDouble(startIndex + 9, inventory.getCost() != null ? inventory.getCost() : 0.0);
+        pstmt.setString(startIndex + 10, inventory.getLocation());
+        pstmt.setBoolean(startIndex + 11, inventory.getActive() != null ? inventory.getActive() : true);
+        pstmt.setString(startIndex + 12, inventory.getVendor());
+        pstmt.setInt(startIndex + 13, inventory.getLeadTimeDays() != null ? inventory.getLeadTimeDays() : 0);
+        pstmt.setInt(startIndex + 14, inventory.getPreferredOrderQty() != null ? inventory.getPreferredOrderQty() : 0);
+        pstmt.setInt(startIndex + 15, inventory.getWasteQty() != null ? inventory.getWasteQty() : 0);
+        pstmt.setString(startIndex + 16, inventory.getLastCountedAt());
+        pstmt.setString(startIndex + 17, inventory.getCountFreq() != null ? inventory.getCountFreq().name() : CountFreq.weekly.name());
+        pstmt.setString(startIndex + 18, inventory.getLot());
+        pstmt.setString(startIndex + 19, inventory.getExpiryDate());
+        pstmt.setString(startIndex + 20, inventory.getAllergen() != null ? inventory.getAllergen().name() : Allergen.none.name());
+        pstmt.setString(startIndex + 21, inventory.getConversion());
     }
 
     // Additional utility methods for inventory management
     public boolean updateInventory(Inventory inventory) throws SQLException {
-        String sql = "UPDATE inventory SET name = ?, sku = ?, category = ?, unit = ?, pack_size = ?, " +
+        String sql = "UPDATE inventory SET item_id = ?, name = ?, sku = ?, category = ?, unit = ?, pack_size = ?, " +
                 "qty_on_hand = ?, par_level = ?, reorder_point = ?, cost = ?, location = ?, active = ?, " +
                 "vendor = ?, lead_time_days = ?, preferred_order_qty = ?, waste_qty = ?, last_counted_at = ?, " +
                 "count_freq = ?, lot = ?, expiry_date = ?, allergen = ?, conversion = ? " +
@@ -248,7 +268,7 @@ public class InventoryDAO {
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            setInventoryPreparedStatement(pstmt, inventory);
+            setInventoryPreparedStatement(pstmt, inventory, 1);
             pstmt.setString(23, inventory.getInventoryId());
 
             return pstmt.executeUpdate() > 0;

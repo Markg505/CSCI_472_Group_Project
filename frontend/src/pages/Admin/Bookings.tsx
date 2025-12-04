@@ -217,18 +217,6 @@ export default function Bookings() {
     }
   }
 
-  async function handleDelete(reservationId?: string) {
-    if (!reservationId) return;
-    if (!confirm('Delete reservation?')) return;
-    try {
-      await apiClient.deleteReservation(reservationId);
-      await loadReservations();
-    } catch (err) {
-      console.error('Delete failed', err);
-      alert('Failed to delete reservation');
-    }
-  }
-
   function clearForm() {
     setForm({
       reservationId: undefined,
@@ -445,6 +433,10 @@ export default function Bookings() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="reservation" label="View Change Log" />
           </span>
 
           <span>
@@ -687,9 +679,6 @@ export default function Bookings() {
                           Edit
                         </button>
 
-                        <button onClick={() => handleDelete(r.reservationId)} className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100">
-                          Delete
-                        </button>
                       </div>
                     )}
                   </td>

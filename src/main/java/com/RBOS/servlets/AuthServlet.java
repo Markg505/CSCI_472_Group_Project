@@ -243,6 +243,7 @@ public class AuthServlet extends HttpServlet {
                     HttpSession s = req.getSession(true);
                     s.setAttribute("userId", userId);
                     s.setAttribute("role", role);
+                    s.setAttribute("userName", fullName);
                     SafeUser u = new SafeUser(
                             userId,
                             role,

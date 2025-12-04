@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../api/client';
 import { ImageUploadComponent } from '../../components/admin/ImageUploadComponent';
+import AuditLogButton from '../../components/AuditLogButton';
 import {
   PlusIcon,
   LinkIcon,
