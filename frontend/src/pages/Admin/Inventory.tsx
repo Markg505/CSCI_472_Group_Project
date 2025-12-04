@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  listInventory, addInventoryItem, updateInventoryItem, removeInventoryItem,
-  type InventoryItem, type Unit, type CountFreq, type Allergen
-} from "../../lib/adminApi";
+import { apiClient, type Inventory, type Unit, type CountFreq, type Allergen } from "../../api/client";
 import {
   CheckIcon, LinkIcon, PencilIcon, TrashIcon, TagIcon, ChevronDownIcon, PlusIcon
 } from "@heroicons/react/20/solid";
 import {
   Menu as HUMenu, MenuButton, MenuItem as HUMenuItem, MenuItems as HUMenuItems
 } from "@headlessui/react";
+import AuditLogButton from '../../components/AuditLogButton';
 
 const UNITS: Unit[] = ["each","lb","oz","case","bag"];
 const COUNTS: CountFreq[] = ["daily","weekly","monthly"];
 const ALLERGENS: Allergen[] = ["none","gluten","dairy","eggs","soy","peanuts","tree-nuts","shellfish","fish","sesame"];
 
-type FormState = Omit<InventoryItem, "id">;
+type FormState = Omit<Inventory, "inventoryId">;
 
 const emptyForm: FormState = {
+  itemId: "",
   name: "", sku: "", category: "",
   unit: "each", packSize: 1,
   qtyOnHand: 0, parLevel: 0, reorderPoint: 0,
@@ -29,16 +28,24 @@ const emptyForm: FormState = {
 };
 
 export default function InventoryAdmin() {
-  const [rows, setRows] = useState<InventoryItem[]>([]);
+  const [rows, setRows] = useState<Inventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [editing, setEditing] = useState<Inventory | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setRows(await listInventory());
+      try {
+        const data = await apiClient.getInventory();
+        setRows(data ?? []);
+      } catch (err) {
+        console.error("load inventory failed", err);
+        setRows([]);
+      } finally {
+        setLoading(false);
+      }
       setLoading(false);
     })();
   }, []);
@@ -51,7 +58,7 @@ export default function InventoryAdmin() {
     [rows]
   );
 
-  function statusFor(r: InventoryItem) {
+  function statusFor(r: Inventory) {
     if (r.qtyOnHand <= r.reorderPoint) return { txt: "reorder", cls: "bg-rose-50 text-rose-700 ring-rose-200" };
     if (r.qtyOnHand < r.parLevel) return { txt: "below par", cls: "bg-amber-50 text-amber-700 ring-amber-200" };
     return { txt: "ok", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" };
@@ -60,8 +67,9 @@ export default function InventoryAdmin() {
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) return;
-    await addInventoryItem({
+    const payload: Omit<Inventory, "inventoryId"> = {
       ...form,
+      itemId: form.itemId?.trim() || null as any,
       packSize: Number(form.packSize) || 1,
       qtyOnHand: Number(form.qtyOnHand) || 0,
       parLevel: Number(form.parLevel) || 0,
@@ -70,22 +78,24 @@ export default function InventoryAdmin() {
       leadTimeDays: Number(form.leadTimeDays) || 0,
       preferredOrderQty: Number(form.preferredOrderQty) || 0,
       wasteQty: Number(form.wasteQty) || 0,
-    });
-    setRows(await listInventory());
+    };
+    await apiClient.createInventory(payload);
+    setRows(await apiClient.getInventory());
     setForm(emptyForm);
     setShowAdd(false);
   }
 
   async function onDelete(id: string) {
-    await removeInventoryItem(id);
-    setRows(await listInventory());
+    await apiClient.deleteInventory(id);
+    setRows(await apiClient.getInventory());
   }
 
   async function onSaveEdit() {
     if (!editing) return;
-    const { id, ...patch } = editing;
-    await updateInventoryItem(id, patch);
-    setRows(await listInventory());
+    const { inventoryId, ...rest } = editing;
+    if (!inventoryId) return;
+    await apiClient.updateInventory({ ...rest, inventoryId });
+    setRows(await apiClient.getInventory());
     setEditing(null);
   }
 
@@ -157,6 +167,10 @@ export default function InventoryAdmin() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="inventory" label="View Change Log" />
           </span>
 
           <span className="sm:ml-3">
@@ -279,16 +293,17 @@ export default function InventoryAdmin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.map(r => {
-                const value = r.qtyOnHand * r.cost;
-                const s = statusFor(r);
-                return (
-                  <tr key={r.id} className="text-sm">
-                    <td className="px-3 py-2">{r.name}</td>
-                    <td className="px-3 py-2">{r.sku}</td>
-                    <td className="px-3 py-2">{r.category}</td>
-                    <td className="px-3 py-2">{r.unit}</td>
-                    <td className="px-3 py-2 text-right">{r.packSize}</td>
+            {rows.map(r => {
+              const value = r.qtyOnHand * r.cost;
+              const s = statusFor(r);
+              const key = r.inventoryId || r.sku;
+              return (
+                <tr key={key} className="text-sm">
+                  <td className="px-3 py-2">{r.name}</td>
+                  <td className="px-3 py-2">{r.sku}</td>
+                  <td className="px-3 py-2">{r.category}</td>
+                  <td className="px-3 py-2">{r.unit}</td>
+                  <td className="px-3 py-2 text-right">{r.packSize}</td>
                     <td className="px-3 py-2 text-right">{r.qtyOnHand}</td>
                     <td className="px-3 py-2 text-right">{r.parLevel}</td>
                     <td className="px-3 py-2 text-right">{r.reorderPoint}</td>
@@ -300,18 +315,18 @@ export default function InventoryAdmin() {
                         {s.txt}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right space-x-2">
-                      <button className="rounded-md border bg-white px-2 py-1 hover:bg-slate-50"
-                        onClick={()=>setEditing(r)}>
-                        <PencilIcon className="size-5 text-slate-600" />
-                      </button>
-                      <button className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
-                        onClick={()=>onDelete(r.id)}>
-                        <TrashIcon className="size-5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
+                  <td className="px-3 py-2 text-right space-x-2">
+                    <button className="rounded-md border bg-white px-2 py-1 hover:bg-slate-50"
+                      onClick={()=>setEditing(r)}>
+                      <PencilIcon className="size-5 text-slate-600" />
+                    </button>
+                    <button className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
+                      onClick={()=>onDelete(r.inventoryId ?? key)}>
+                      <TrashIcon className="size-5" />
+                    </button>
+                  </td>
+                </tr>
+              );
               })}
               {rows.length === 0 && (
                 <tr>

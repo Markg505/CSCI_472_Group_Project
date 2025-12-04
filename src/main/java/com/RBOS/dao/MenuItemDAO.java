@@ -6,13 +6,17 @@ import com.RBOS.utils.DatabaseConnection;
 import jakarta.servlet.ServletContext;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MenuItemDAO {
     private ServletContext context;
-    
+    private AuditLogDAO auditLogDAO;
+
     public MenuItemDAO(ServletContext context) {
         this.context = context;
+        this.auditLogDAO = new AuditLogDAO(context);
     }
 
     public List<MenuItem> getAllMenuItems() throws SQLException {
@@ -141,7 +145,12 @@ public class MenuItemDAO {
         return menuItems;
     }
 
+    // Backward compatible version without audit logging
     public String createMenuItem(MenuItem menuItem) throws SQLException {
+        return createMenuItem(menuItem, null, null);
+    }
+
+    public String createMenuItem(MenuItem menuItem, String userId, String userName) throws SQLException {
         String itemId = menuItem.getItemId();
         if (itemId == null || itemId.isBlank()) {
             itemId = java.util.UUID.randomUUID().toString();
@@ -166,13 +175,30 @@ public class MenuItemDAO {
             int affectedRows = pstmt.executeUpdate();
 
             if (affectedRows > 0) {
+                // Log the creation
+                if (userId != null && userName != null) {
+                    Map<String, Object> newValues = new HashMap<>();
+                    newValues.put("name", menuItem.getName());
+                    newValues.put("price", menuItem.getPrice());
+                    newValues.put("category", menuItem.getCategory());
+                    newValues.put("active", menuItem.getActive());
+                    auditLogDAO.logAction(userId, userName, "menu_item", itemId, "create", null, newValues);
+                }
                 return itemId;
             }
         }
         return null;
     }
 
+    // Backward compatible version without audit logging
     public boolean updateMenuItem(MenuItem menuItem) throws SQLException {
+        return updateMenuItem(menuItem, null, null);
+    }
+
+    public boolean updateMenuItem(MenuItem menuItem, String userId, String userName) throws SQLException {
+        // Get old values first for audit log
+        MenuItem oldItem = getMenuItemById(menuItem.getItemId());
+
         String sql = "UPDATE menu_items SET name = ?, description = ?, category = ?, " +
                 "price = ?, active = ?, image_url = ?, dietary_tags = ?, out_of_stock = ? WHERE item_id = ?";
 
@@ -189,31 +215,93 @@ public class MenuItemDAO {
             pstmt.setBoolean(8, menuItem.getOutOfStock() != null ? menuItem.getOutOfStock() : false);
             pstmt.setString(9, menuItem.getItemId());
 
-            return pstmt.executeUpdate() > 0;
+            boolean success = pstmt.executeUpdate() > 0;
+
+            // Log the update
+            if (success && userId != null && userName != null && oldItem != null) {
+                Map<String, Object> oldValues = new HashMap<>();
+                oldValues.put("name", oldItem.getName());
+                oldValues.put("price", oldItem.getPrice());
+                oldValues.put("category", oldItem.getCategory());
+                oldValues.put("active", oldItem.getActive());
+                oldValues.put("outOfStock", oldItem.getOutOfStock());
+
+                Map<String, Object> newValues = new HashMap<>();
+                newValues.put("name", menuItem.getName());
+                newValues.put("price", menuItem.getPrice());
+                newValues.put("category", menuItem.getCategory());
+                newValues.put("active", menuItem.getActive());
+                newValues.put("outOfStock", menuItem.getOutOfStock());
+
+                auditLogDAO.logAction(userId, userName, "menu_item", menuItem.getItemId(), "update", oldValues, newValues);
+            }
+
+            return success;
         }
     }
     
+    // Backward compatible version without audit logging
     public boolean toggleMenuItemStatus(String itemId, Boolean active) throws SQLException {
+        return toggleMenuItemStatus(itemId, active, null, null);
+    }
+
+    public boolean toggleMenuItemStatus(String itemId, Boolean active, String userId, String userName) throws SQLException {
+        // Get old value first for audit log
+        MenuItem oldItem = getMenuItemById(itemId);
+
         String sql = "UPDATE menu_items SET active = ? WHERE item_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setBoolean(1, active);
             pstmt.setString(2, itemId);
-            
-            return pstmt.executeUpdate() > 0;
+
+            boolean success = pstmt.executeUpdate() > 0;
+
+            // Log the toggle
+            if (success && userId != null && userName != null && oldItem != null) {
+                Map<String, Object> oldValues = new HashMap<>();
+                oldValues.put("active", oldItem.getActive());
+
+                Map<String, Object> newValues = new HashMap<>();
+                newValues.put("active", active);
+
+                auditLogDAO.logAction(userId, userName, "menu_item", itemId, "toggle_active", oldValues, newValues);
+            }
+
+            return success;
         }
     }
-    
+
+    // Backward compatible version without audit logging
     public boolean deleteMenuItem(String itemId) throws SQLException {
+        return deleteMenuItem(itemId, null, null);
+    }
+
+    public boolean deleteMenuItem(String itemId, String userId, String userName) throws SQLException {
+        // Get old values first for audit log
+        MenuItem oldItem = getMenuItemById(itemId);
+
         String sql = "DELETE FROM menu_items WHERE item_id = ?";
-        
+
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, itemId);
-            return pstmt.executeUpdate() > 0;
+            boolean success = pstmt.executeUpdate() > 0;
+
+            // Log the deletion
+            if (success && userId != null && userName != null && oldItem != null) {
+                Map<String, Object> oldValues = new HashMap<>();
+                oldValues.put("name", oldItem.getName());
+                oldValues.put("price", oldItem.getPrice());
+                oldValues.put("category", oldItem.getCategory());
+
+                auditLogDAO.logAction(userId, userName, "menu_item", itemId, "delete", oldValues, null);
+            }
+
+            return success;
         }
     }
 }

@@ -13,6 +13,7 @@ import {
   MenuItem as HUMenuItem,
   MenuItems as HUMenuItems,
 } from "@headlessui/react";
+import AuditLogButton from '../../components/AuditLogButton';
 
 export default function TablesAdmin() {
   const [rows, setRows] = useState<DiningTable[]>([]);
@@ -121,6 +122,10 @@ export default function TablesAdmin() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="table" label="View Change Log" />
           </span>
 
           <span className="sm:ml-3">

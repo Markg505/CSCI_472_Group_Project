@@ -66,11 +66,11 @@ CREATE TABLE menu_items (
 -- inventory
 CREATE TABLE inventory (
   inventory_id        TEXT PRIMARY KEY,
-  item_id             TEXT NOT NULL,
+  item_id             TEXT,
   name                TEXT NOT NULL,
   sku                 TEXT UNIQUE NOT NULL,
   category            TEXT NOT NULL,
-  unit                TEXT NOT NULL CHECK (unit IN ('each','lb','oz','cases','bag')),
+  unit                TEXT NOT NULL CHECK (unit IN ('each','lb','oz','case','cases','bag')),
   pack_size           INTEGER NOT NULL DEFAULT 1,
   qty_on_hand         INTEGER NOT NULL DEFAULT 0,
   par_level           INTEGER NOT NULL DEFAULT 0,
@@ -89,7 +89,7 @@ CREATE TABLE inventory (
   allergen            TEXT CHECK (allergen IN ('none','gluten','dairy','eggs','soy','peanuts','tree-nuts','shellfish','fish','sesame')),
   conversion          TEXT,
   created_utc         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY (item_id) REFERENCES menu_items(item_id) ON DELETE CASCADE
+  FOREIGN KEY (item_id) REFERENCES menu_items(item_id) ON DELETE SET NULL
 );
 
 -- orders
@@ -132,6 +132,23 @@ CREATE TABLE order_items (
 );
 
 CREATE INDEX idx_order_items_order ON order_items(order_id);
+
+-- audit log
+CREATE TABLE audit_log (
+  log_id         TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  user_name      TEXT NOT NULL,
+  entity_type    TEXT NOT NULL CHECK (entity_type IN ('menu_item','inventory','user','order','reservation','table')),
+  entity_id      TEXT NOT NULL,
+  action         TEXT NOT NULL CHECK (action IN ('create','update','delete','toggle_active','toggle_out_of_stock')),
+  old_values     TEXT,
+  new_values     TEXT,
+  created_utc    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_audit_log_entity ON audit_log(entity_type, entity_id, created_utc);
+CREATE INDEX idx_audit_log_user ON audit_log(user_id, created_utc);
 
 -- ===== seed data ============================================================
 BEGIN TRANSACTION;
@@ -178,21 +195,21 @@ INSERT INTO menu_items (item_id, name, description, category, price, active, ima
 
 -- INVENTORY
 INSERT INTO inventory (
-  item_id, name, sku, category, unit, pack_size, qty_on_hand, par_level, reorder_point,
+  inventory_id, item_id, name, sku, category, unit, pack_size, qty_on_hand, par_level, reorder_point,
   cost, location, vendor, lead_time_days, count_freq, allergen
 ) VALUES
-  ('1', 'Margherita Pizza Kit', 'PIZ-MAR-001', 'Pizza', 'cases', 1, 50, 20, 10, 4.50, 'Cold Storage A1', 'Sysco', 3, 'weekly', 'dairy'),
-  ('2', 'Pepperoni Pizza Kit', 'PIZ-PEP-001', 'Pizza', 'cases', 1, 45, 25, 12, 5.25, 'Cold Storage A2', 'US Foods', 2, 'weekly', 'none'),
-  ('3', 'Caesar Salad Kit', 'SAL-CAE-001', 'Salad', 'cases', 1, 30, 15, 8, 3.75, 'Produce Section', 'Fresh Farms', 1, 'daily', 'dairy'),
-  ('4', 'House Salad Kit', 'SAL-HOU-001', 'Salad', 'cases', 1, 35, 18, 9, 2.95, 'Produce Section', 'Local Growers', 1, 'daily', 'none'),
-  ('5', 'Spaghetti Bolognese Kit', 'PAS-BOL-001', 'Pasta', 'cases', 1, 40, 22, 11, 6.80, 'Dry Storage', 'Italian Imports', 2, 'weekly', 'none'),
-  ('6', 'Salmon Fillet', 'FIS-SAL-001', 'Seafood', 'lb', 1, 25, 12, 6, 8.50, 'Seafood Cooler', 'Ocean Fresh', 1, 'daily', 'fish'),
-  ('7', 'Ribeye Steak', 'MEA-RIB-001', 'Meat', 'each', 1, 30, 15, 8, 12.00, 'Butcher Cooler', 'Prime Meats', 2, 'daily', 'none'),
-  ('8', 'Garlic Bread', 'SID-GAR-001', 'Bakery', 'cases', 12, 100, 40, 20, 0.85, 'Bakery Section', 'Bread Co', 2, 'weekly', 'gluten'),
-  ('9', 'Tomato Soup Base', 'SID-TOM-001', 'Soup', 'cases', 1, 20, 10, 5, 2.25, 'Dry Storage', 'Soup Supply', 3, 'weekly', 'none'),
-  ('10', 'Cheesecake', 'DES-CHE-001', 'Dessert', 'each', 1, 15, 8, 4, 2.50, 'Dessert Cooler', 'Sweet Creations', 2, 'weekly', 'dairy'),
-  ('11', 'Tiramisu', 'DES-TIR-001', 'Dessert', 'each', 1, 12, 6, 3, 2.75, 'Dessert Cooler', 'Italian Desserts', 2, 'weekly', 'dairy'),
-  ('12', 'Iced Tea Mix', 'BEV-TEA-001', 'Beverage', 'cases', 1, 50, 25, 12, 0.75, 'Dry Storage', 'Beverage Co', 3, 'monthly', 'none');
+  ('inv-1', '1', 'Margherita Pizza Kit', 'PIZ-MAR-001', 'Pizza', 'case', 1, 50, 20, 10, 4.50, 'Cold Storage A1', 'Sysco', 3, 'weekly', 'dairy'),
+  ('inv-2', '2', 'Pepperoni Pizza Kit', 'PIZ-PEP-001', 'Pizza', 'case', 1, 45, 25, 12, 5.25, 'Cold Storage A2', 'US Foods', 2, 'weekly', 'none'),
+  ('inv-3', '3', 'Caesar Salad Kit', 'SAL-CAE-001', 'Salad', 'case', 1, 30, 15, 8, 3.75, 'Produce Section', 'Fresh Farms', 1, 'daily', 'dairy'),
+  ('inv-4', '4', 'House Salad Kit', 'SAL-HOU-001', 'Salad', 'case', 1, 35, 18, 9, 2.95, 'Produce Section', 'Local Growers', 1, 'daily', 'none'),
+  ('inv-5', '5', 'Spaghetti Bolognese Kit', 'PAS-BOL-001', 'Pasta', 'case', 1, 40, 22, 11, 6.80, 'Dry Storage', 'Italian Imports', 2, 'weekly', 'none'),
+  ('inv-6', '6', 'Salmon Fillet', 'FIS-SAL-001', 'Seafood', 'lb', 1, 25, 12, 6, 8.50, 'Seafood Cooler', 'Ocean Fresh', 1, 'daily', 'fish'),
+  ('inv-7', '7', 'Ribeye Steak', 'MEA-RIB-001', 'Meat', 'each', 1, 30, 15, 8, 12.00, 'Butcher Cooler', 'Prime Meats', 2, 'daily', 'none'),
+  ('inv-8', '8', 'Garlic Bread', 'SID-GAR-001', 'Bakery', 'case', 12, 100, 40, 20, 0.85, 'Bakery Section', 'Bread Co', 2, 'weekly', 'gluten'),
+  ('inv-9', '9', 'Tomato Soup Base', 'SID-TOM-001', 'Soup', 'case', 1, 20, 10, 5, 2.25, 'Dry Storage', 'Soup Supply', 3, 'weekly', 'none'),
+  ('inv-10', '10', 'Cheesecake', 'DES-CHE-001', 'Dessert', 'each', 1, 15, 8, 4, 2.50, 'Dessert Cooler', 'Sweet Creations', 2, 'weekly', 'dairy'),
+  ('inv-11', '11', 'Tiramisu', 'DES-TIR-001', 'Dessert', 'each', 1, 12, 6, 3, 2.75, 'Dessert Cooler', 'Italian Desserts', 2, 'weekly', 'dairy'),
+  ('inv-12', '12', 'Iced Tea Mix', 'BEV-TEA-001', 'Beverage', 'case', 1, 50, 25, 12, 0.75, 'Dry Storage', 'Beverage Co', 3, 'monthly', 'none');
 
 -- RESERVATIONS (10)
 INSERT INTO reservations

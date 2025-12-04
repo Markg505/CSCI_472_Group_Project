@@ -8,7 +8,8 @@ import {
 } from "@heroicons/react/20/solid";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useAuth } from "../../features/auth/useAuth";
-import { apiClient, type User } from '../../api/client'; 
+import { apiClient, type User } from '../../api/client';
+import AuditLogButton from '../../components/AuditLogButton'; 
 
 type RawUser = Partial<User>;
 
@@ -204,6 +205,10 @@ export default function Users() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="user" label="View Change Log" />
           </span>
 
           <span className="sm:ml-3">

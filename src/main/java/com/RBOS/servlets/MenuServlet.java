@@ -84,17 +84,22 @@ public class MenuServlet extends HttpServlet {
     }
     
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
+
             JsonNode root = objectMapper.readTree(request.getReader());
             MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
-            String itemId = menuItemDAO.createMenuItem(menuItem);
-            
+            String itemId = menuItemDAO.createMenuItem(menuItem, userId, userName);
+
             if (itemId != null) {
                 menuItem.setItemId(itemId);
 
@@ -159,11 +164,17 @@ public class MenuServlet extends HttpServlet {
             }
 
             String itemId = splits[1];
+
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
+
             JsonNode root = objectMapper.readTree(request.getReader());
             MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
             menuItem.setItemId(itemId); // Ensure the ID matches the path
 
-            boolean success = menuItemDAO.updateMenuItem(menuItem);
+            boolean success = menuItemDAO.updateMenuItem(menuItem, userId, userName);
 
             if (success) {
                 linkInventory(root, itemId);
@@ -180,9 +191,9 @@ public class MenuServlet extends HttpServlet {
     }
     
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -190,9 +201,14 @@ public class MenuServlet extends HttpServlet {
                 return;
             }
 
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
+
             String itemId = pathInfo.split("/")[1];
-            boolean success = menuItemDAO.deleteMenuItem(itemId);
-            
+            boolean success = menuItemDAO.deleteMenuItem(itemId, userId, userName);
+
             if (success) {
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {

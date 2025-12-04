@@ -1,5 +1,6 @@
 package com.RBOS.servlets;
 
+import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.dao.UserDAO;
 import com.RBOS.models.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,16 +11,20 @@ import jakarta.servlet.annotation.*;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @WebServlet("/api/users/*")
 public class UserServlet extends HttpServlet {
     private UserDAO userDAO;
     private ObjectMapper objectMapper;
+    private AuditLogDAO auditLogDAO;
     
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         userDAO = new UserDAO(getServletContext());
+        auditLogDAO = new AuditLogDAO(getServletContext());
     }
     
     @Override
@@ -83,6 +88,9 @@ public class UserServlet extends HttpServlet {
         
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
+        HttpSession session = request.getSession(false);
+        String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
+        String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
         
         try {
             User user = objectMapper.readValue(request.getReader(), User.class);
@@ -90,6 +98,14 @@ public class UserServlet extends HttpServlet {
             
             if (userId != null) {
                 user.setUserId(userId);
+                if (actingUserId != null && actingUserName != null) {
+                    Map<String, Object> newValues = new HashMap<>();
+                    newValues.put("role", user.getRole());
+                    newValues.put("fullName", user.getFullName());
+                    newValues.put("email", user.getEmail());
+                    newValues.put("phone", user.getPhone());
+                    auditLogDAO.logAction(actingUserId, actingUserName, "user", userId, "create", null, newValues);
+                }
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(user));
             } else {
@@ -122,12 +138,31 @@ public class UserServlet extends HttpServlet {
             }
 
             String userId = pathInfo.split("/")[1];
+            User existing = userDAO.getUserById(userId);
             User user = objectMapper.readValue(request.getReader(), User.class);
             user.setUserId(userId); // Ensure the ID matches the path
             
             boolean success = userDAO.updateUser(user);
             
             if (success) {
+                HttpSession session = request.getSession(false);
+                String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
+                String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
+                if (actingUserId != null && actingUserName != null && existing != null) {
+                    Map<String, Object> oldValues = new HashMap<>();
+                    oldValues.put("role", existing.getRole());
+                    oldValues.put("fullName", existing.getFullName());
+                    oldValues.put("email", existing.getEmail());
+                    oldValues.put("phone", existing.getPhone());
+
+                    Map<String, Object> newValues = new HashMap<>();
+                    newValues.put("role", user.getRole());
+                    newValues.put("fullName", user.getFullName());
+                    newValues.put("email", user.getEmail());
+                    newValues.put("phone", user.getPhone());
+
+                    auditLogDAO.logAction(actingUserId, actingUserName, "user", userId, "update", oldValues, newValues);
+                }
                 response.getWriter().write(objectMapper.writeValueAsString(user));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -152,9 +187,21 @@ public class UserServlet extends HttpServlet {
             }
 
             String userId = pathInfo.split("/")[1];
+            User existing = userDAO.getUserById(userId);
             boolean success = userDAO.deleteUser(userId);
             
             if (success) {
+                HttpSession session = request.getSession(false);
+                String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
+                String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
+                if (actingUserId != null && actingUserName != null && existing != null) {
+                    Map<String, Object> oldValues = new HashMap<>();
+                    oldValues.put("role", existing.getRole());
+                    oldValues.put("fullName", existing.getFullName());
+                    oldValues.put("email", existing.getEmail());
+                    oldValues.put("phone", existing.getPhone());
+                    auditLogDAO.logAction(actingUserId, actingUserName, "user", userId, "delete", oldValues, null);
+                }
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
