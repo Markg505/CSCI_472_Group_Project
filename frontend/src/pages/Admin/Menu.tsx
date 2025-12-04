@@ -7,6 +7,7 @@ import {
   TagIcon,
 } from '@heroicons/react/20/solid';
 import type { MenuItem } from '../../lib/adminApi';
+import AuditLogButton from '../../components/AuditLogButton';
 
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=1200&auto=format&fit=crop";
 
@@ -479,6 +480,10 @@ export default function MenuAdmin() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="menu_item" label="View Change Log" />
           </span>
         </div>
       </div>

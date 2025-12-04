@@ -2,6 +2,7 @@ package com.RBOS.servlets;
 
 import com.RBOS.dao.ReservationDAO;
 import com.RBOS.dao.DiningTableDAO;
+import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.models.PagedResult;
 import com.RBOS.models.Reservation;
 import com.RBOS.services.EmailService;
@@ -29,6 +30,8 @@ public class ReservationServlet extends HttpServlet {
     private static final int RETENTION_MONTHS = 13;
     private ReservationDAO reservationDAO;
     private DiningTableDAO diningTableDAO;
+    private AuditLogDAO auditDAO;
+    private UserDAO userDAO;
     private ObjectMapper objectMapper;
 
     @Override
@@ -36,6 +39,8 @@ public class ReservationServlet extends HttpServlet {
         objectMapper = new ObjectMapper();
         reservationDAO = new ReservationDAO(getServletContext());
         diningTableDAO = new DiningTableDAO(getServletContext());
+        auditDAO = new AuditLogDAO(getServletContext());
+        userDAO = new UserDAO(getServletContext());
     }
 
     @Override

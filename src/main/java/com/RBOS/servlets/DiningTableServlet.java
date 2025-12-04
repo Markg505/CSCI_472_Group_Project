@@ -1,5 +1,6 @@
 package com.RBOS.servlets;
 
+import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.dao.DiningTableDAO;
 import com.RBOS.models.DiningTable;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,11 +16,13 @@ import java.util.List;
 public class DiningTableServlet extends HttpServlet {
     private DiningTableDAO diningTableDAO;
     private ObjectMapper objectMapper;
+    private AuditLogDAO auditLogDAO;
     
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         diningTableDAO = new DiningTableDAO(getServletContext());
+        auditLogDAO = new AuditLogDAO(getServletContext());
     }
     
     @Override
@@ -77,6 +80,9 @@ public class DiningTableServlet extends HttpServlet {
             
             if (tableId != null) {
                 table.setTableId(tableId);
+                try {
+                    logAudit(request, "table", tableId, "create", null, objectMapper.writeValueAsString(table));
+                } catch (Exception ignored) {}
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
@@ -111,6 +117,9 @@ public class DiningTableServlet extends HttpServlet {
             boolean success = diningTableDAO.updateTable(table);
             
             if (success) {
+                try {
+                    logAudit(request, "table", tableId, "update", null, objectMapper.writeValueAsString(table));
+                } catch (Exception ignored) {}
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -135,6 +144,9 @@ public class DiningTableServlet extends HttpServlet {
             String tableId = pathInfo.split("/")[1];
             boolean success = diningTableDAO.deleteTable(tableId);
             if (success) {
+                try {
+                    logAudit(request, "table", tableId, "delete", null, null);
+                } catch (Exception ignored) {}
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -142,6 +154,16 @@ public class DiningTableServlet extends HttpServlet {
         } catch (SQLException e) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             e.printStackTrace();
+        }
+    }
+
+    private void logAudit(HttpServletRequest req, String entityType, String entityId,
+                          String action, String oldValue, String newValue) throws Exception {
+        HttpSession session = req.getSession(false);
+        String actorId = session != null ? (String) session.getAttribute("userId") : null;
+        String actorName = session != null ? (String) session.getAttribute("userName") : null;
+        if (actorId != null) {
+            auditLogDAO.log(entityType, entityId, action, actorId, actorName, oldValue, newValue);
         }
     }
 }

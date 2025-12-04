@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiClient, type Reservation, type HistoryResult, type DiningTable } from '../../api/client';
 import { CalendarIcon, CheckIcon, ChevronDownIcon, LinkIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import { Menu as HUMenu, MenuButton as HUMenuButton, MenuItem as HUMenuItem, MenuItems as HUMenuItems } from '@headlessui/react';
+import AuditLogButton from '../../components/AuditLogButton';
 
 const statusOptions = ['pending', 'confirmed', 'cancelled', 'no_show'] as const;
 
@@ -444,6 +445,10 @@ export default function Bookings() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span>
+            <AuditLogButton entityType="reservation" label="View Change Log" />
           </span>
 
           <span>

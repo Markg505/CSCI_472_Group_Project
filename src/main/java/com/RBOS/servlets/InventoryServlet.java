@@ -1,5 +1,6 @@
 package com.RBOS.servlets;
 
+import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.dao.InventoryDAO;
 import com.RBOS.models.Inventory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,11 +16,13 @@ import java.util.List;
 public class InventoryServlet extends HttpServlet {
     private InventoryDAO inventoryDAO;
     private ObjectMapper objectMapper;
+    private AuditLogDAO auditLogDAO;
     
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         inventoryDAO = new InventoryDAO(getServletContext());
+        auditLogDAO = new AuditLogDAO(getServletContext());
     }
     
     @Override
