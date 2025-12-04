@@ -256,7 +256,8 @@ public class OrderDAO {
         }
 
         String sql = "INSERT INTO orders (order_id, user_id, cart_token, source, status, fulfillment_type, " +
-                "subtotal, tax, total, customer_name, customer_phone, customer_email, delivery_address, delivery_address2, " +
+                "subtotal, tax, total, customer_name, customer_phone, customer_email, delivery_address, delivery_address2, "
+                +
                 "delivery_city, delivery_state, delivery_postal_code, delivery_instructions) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -318,7 +319,8 @@ public class OrderDAO {
                     // Only send email if we have a valid email address
                     if (customerEmail != null && !customerEmail.isBlank()) {
                         EmailService emailService = new EmailService();
-                        String customerName = order.getCustomerName() != null ? order.getCustomerName() : "Valued Customer";
+                        String customerName = order.getCustomerName() != null ? order.getCustomerName()
+                                : "Valued Customer";
                         String emailBody;
 
                         // Use delivery template if it's a delivery order
@@ -348,7 +350,8 @@ public class OrderDAO {
                                 "Order Confirmation - " + orderId,
                                 emailBody);
                     } else {
-                        System.out.println("No email address available for order " + orderId + ", skipping email notification");
+                        System.out.println(
+                                "No email address available for order " + orderId + ", skipping email notification");
                     }
                 } catch (Exception e) {
                     System.err.println("Failed to send order confirmation email: " + e.getMessage());
@@ -363,7 +366,8 @@ public class OrderDAO {
 
     public boolean updateOrder(Order order) throws SQLException {
         String sql = "UPDATE orders SET user_id = ?, cart_token = ?, source = ?, status = ?, fulfillment_type = ?, " +
-                "subtotal = ?, tax = ?, total = ?, customer_name = ?, customer_phone = ?, customer_email = ?, delivery_address = ?, " +
+                "subtotal = ?, tax = ?, total = ?, customer_name = ?, customer_phone = ?, customer_email = ?, delivery_address = ?, "
+                +
                 "delivery_address2 = ?, delivery_city = ?, delivery_state = ?, delivery_postal_code = ?, " +
                 "delivery_instructions = ? WHERE order_id = ?";
 

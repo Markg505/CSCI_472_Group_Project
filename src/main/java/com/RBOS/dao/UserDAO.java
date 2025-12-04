@@ -155,7 +155,8 @@ public class UserDAO {
         }
     }
 
-    public boolean updateProfile(String userId, String fullName, String email, String phone, String address, String address2, String city, String state, String postalCode) throws SQLException {
+    public boolean updateProfile(String userId, String fullName, String email, String phone, String address,
+            String address2, String city, String state, String postalCode) throws SQLException {
         String sql = "UPDATE users SET full_name = ?, email = ?, phone = ?, address = ?, address2 = ?, city = ?, state = ?, postal_code = ? WHERE user_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);

@@ -397,8 +397,7 @@ public class AuthServlet extends HttpServlet {
                             user.getAddress2(),
                             user.getCity(),
                             user.getState(),
-                            user.getPostalCode()
-                    );
+                            user.getPostalCode());
 
                     resp.setStatus(HttpServletResponse.SC_CREATED);
                     mapper.writeValue(resp.getWriter(), su);
@@ -712,7 +711,7 @@ public class AuthServlet extends HttpServlet {
         public String postalCode;
 
         public SafeUser(String userId, String role, String fullName, String email, String phone,
-                        String address, String address2, String city, String state, String postalCode) {
+                String address, String address2, String city, String state, String postalCode) {
             this.userId = userId;
             this.role = role;
             this.fullName = fullName;

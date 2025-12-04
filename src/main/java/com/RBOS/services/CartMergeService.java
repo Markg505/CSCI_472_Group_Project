@@ -43,7 +43,8 @@ public class CartMergeService {
         private final List<Conflict> clamped;
         private final List<Conflict> mergedQuantities;
 
-        public MergeResult(List<OrderItem> mergedItems, List<Conflict> dropped, List<Conflict> clamped, List<Conflict> mergedQuantities) {
+        public MergeResult(List<OrderItem> mergedItems, List<Conflict> dropped, List<Conflict> clamped,
+                List<Conflict> mergedQuantities) {
             this.mergedItems = mergedItems;
             this.dropped = dropped;
             this.clamped = clamped;
@@ -67,7 +68,8 @@ public class CartMergeService {
         }
     }
 
-    public MergeResult merge(List<MergeItem> incoming, List<OrderItem> existing, Map<String, Inventory> inventoryByItem) {
+    public MergeResult merge(List<MergeItem> incoming, List<OrderItem> existing,
+            Map<String, Inventory> inventoryByItem) {
         // Key on item + notes so distinct customizations are kept separate
         Map<String, Integer> requestedQty = new HashMap<>();
         Map<String, Double> incomingPrice = new HashMap<>();
@@ -117,7 +119,8 @@ public class CartMergeService {
                     : "");
             String noteVal = incomingNotes.getOrDefault(key, null);
 
-            if (inventory == null || Boolean.FALSE.equals(inventory.getActive()) || inventory.getQtyOnHand() == null || inventory.getQtyOnHand() <= 0) {
+            if (inventory == null || Boolean.FALSE.equals(inventory.getActive()) || inventory.getQtyOnHand() == null
+                    || inventory.getQtyOnHand() <= 0) {
                 dropped.add(new Conflict(itemId, itemName, "out_of_stock", desired, 0));
                 continue;
             }

@@ -17,24 +17,24 @@ public class DiningTableServlet extends HttpServlet {
     private DiningTableDAO diningTableDAO;
     private ObjectMapper objectMapper;
     private AuditLogDAO auditLogDAO;
-    
+
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         diningTableDAO = new DiningTableDAO(getServletContext());
         auditLogDAO = new AuditLogDAO(getServletContext());
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
+
             if (pathInfo == null || pathInfo.equals("/")) {
                 // Get all tables
                 List<DiningTable> tables = diningTableDAO.getAllTables();
@@ -49,7 +49,7 @@ public class DiningTableServlet extends HttpServlet {
 
                 String tableId = splits[1];
                 DiningTable table = diningTableDAO.getTableById(tableId);
-                
+
                 if (table != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(table));
                 } else {
@@ -63,26 +63,27 @@ public class DiningTableServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
             if (table.getName() == null || table.getName().isBlank()) {
-                table.setName("Table " + (int)(Math.random() * 1000));
+                table.setName("Table " + (int) (Math.random() * 1000));
             }
             String tableId = diningTableDAO.createTable(table);
-            
+
             if (tableId != null) {
                 table.setTableId(tableId);
                 try {
                     logAudit(request, "table", tableId, "create", null, objectMapper.writeValueAsString(table));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
@@ -95,14 +96,14 @@ public class DiningTableServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -113,13 +114,14 @@ public class DiningTableServlet extends HttpServlet {
             String tableId = pathInfo.split("/")[1];
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
             table.setTableId(tableId); // Ensure the ID matches the path
-            
+
             boolean success = diningTableDAO.updateTable(table);
-            
+
             if (success) {
                 try {
                     logAudit(request, "table", tableId, "update", null, objectMapper.writeValueAsString(table));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -146,7 +148,8 @@ public class DiningTableServlet extends HttpServlet {
             if (success) {
                 try {
                     logAudit(request, "table", tableId, "delete", null, null);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -158,7 +161,7 @@ public class DiningTableServlet extends HttpServlet {
     }
 
     private void logAudit(HttpServletRequest req, String entityType, String entityId,
-                          String action, String oldValue, String newValue) throws Exception {
+            String action, String oldValue, String newValue) throws Exception {
         HttpSession session = req.getSession(false);
         String actorId = session != null ? (String) session.getAttribute("userId") : null;
         String actorName = session != null ? (String) session.getAttribute("userName") : null;

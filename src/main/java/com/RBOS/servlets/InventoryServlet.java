@@ -18,25 +18,25 @@ public class InventoryServlet extends HttpServlet {
     private InventoryDAO inventoryDAO;
     private ObjectMapper objectMapper;
     private AuditLogDAO auditLogDAO;
-    
+
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         inventoryDAO = new InventoryDAO(getServletContext());
         auditLogDAO = new AuditLogDAO(getServletContext());
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         System.out.println("InventoryServlet doGet path=" + request.getPathInfo());
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
+
             if (pathInfo == null || pathInfo.equals("/")) {
                 // Get all inventory
                 List<Inventory> inventory = inventoryDAO.getAllInventory();
@@ -108,20 +108,20 @@ public class InventoryServlet extends HttpServlet {
     }
 
     @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         System.out.println("InventoryServlet doPut path=" + request.getPathInfo());
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.equals("/")) {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
+
             String[] splits = pathInfo.split("/");
 
             // Full update /{inventoryId}
@@ -154,17 +154,17 @@ public class InventoryServlet extends HttpServlet {
             String itemId = splits[2];
             String action = splits[3];
             Inventory before = inventoryDAO.getInventoryByItemId(itemId);
-            
+
             if ("quantity".equals(action)) {
                 String quantityStr = request.getParameter("quantity");
                 if (quantityStr == null) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Quantity parameter required");
                     return;
                 }
-                
+
                 int quantity = Integer.parseInt(quantityStr);
                 boolean success = inventoryDAO.updateInventoryQuantity(itemId, quantity);
-                
+
                 if (success) {
                     Inventory updated = inventoryDAO.getInventoryByItemId(itemId);
                     logChange("inventory", itemId, "update_quantity", before, updated, request);
@@ -178,10 +178,10 @@ public class InventoryServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Quantity parameter required");
                     return;
                 }
-                
+
                 int quantity = Integer.parseInt(quantityStr);
                 boolean success = inventoryDAO.decrementInventory(itemId, quantity);
-                
+
                 if (success) {
                     Inventory updated = inventoryDAO.getInventoryByItemId(itemId);
                     logChange("inventory", itemId, "decrement", before, updated, request);
@@ -225,15 +225,18 @@ public class InventoryServlet extends HttpServlet {
         }
     }
 
-    private void logChange(String entityType, String entityId, String action, Inventory before, Inventory after, HttpServletRequest request) {
+    private void logChange(String entityType, String entityId, String action, Inventory before, Inventory after,
+            HttpServletRequest request) {
         try {
             String oldJson = before != null ? objectMapper.writeValueAsString(before) : null;
             String newJson = after != null ? objectMapper.writeValueAsString(after) : null;
             HttpSession session = request.getSession(false);
             String userId = session != null && session.getAttribute("userId") != null
-                    ? session.getAttribute("userId").toString() : "system";
+                    ? session.getAttribute("userId").toString()
+                    : "system";
             String userName = session != null && session.getAttribute("userName") != null
-                    ? session.getAttribute("userName").toString() : "System";
+                    ? session.getAttribute("userName").toString()
+                    : "System";
             auditLogDAO.log(entityType, entityId, action, userId, userName, oldJson, newJson);
         } catch (Exception e) {
             // swallow audit failures to avoid blocking core flow
