@@ -24,16 +24,11 @@ public class DatabaseConnection {
         String path = System.getProperty("RBOS_DB");
         if (isBlank(path))
             path = System.getenv("RBOS_DB");
-        if (isBlank(path) && context != null) {
-            String ctxPath = context.getInitParameter("RBOS_DB");
-            if (!isBlank(ctxPath) && !ctxPath.contains("@DB_PATH@")) {
-                path = ctxPath;
-            }
-        }
-        // Default to user-local DB in ~/.rbos/restaurant.db
-        if (isBlank(path))
+        if (isBlank(path) && context != null)
+            path = context.getInitParameter("RBOS_DB");
+        if (isBlank(path)) {
             path = Paths.get(System.getProperty("user.home"), ".rbos", "restaurant.db").toString();
-
+        }
         Path p = Paths.get(path).toAbsolutePath().normalize();
         try {
             Path parent = p.getParent();
@@ -112,18 +107,11 @@ public class DatabaseConnection {
 
     private static void seedIfMissing(String absolutePath) {
         Path target = Paths.get(absolutePath);
-        if (Files.exists(target)) {
-            System.out.println("[DB] Existing database found at: " + target + ". Skipping seeding.");
+        if (Files.exists(target))
             return;
-        }
-        System.out.println("[DB] Database file not found at: " + target + ". Attempting to seed...");
 
-        if (seedFromSchema(target)) {
-            System.out.println("[DB] Successfully seeded from schema.sql.");
+        if (seedFromSchema(target))
             return;
-        } else {
-            System.out.println("[DB] Seeding from schema.sql failed or returned false. Attempting to copy pre-seeded DB.");
-        }
 
         try (InputStream in = DatabaseConnection.class
                 .getClassLoader()
@@ -154,19 +142,6 @@ public class DatabaseConnection {
             String dbUrl = "jdbc:sqlite:" + dbPath;
 
             Connection conn = DriverManager.getConnection(dbUrl);
-
-            try (java.sql.Statement stmt = conn.createStatement();
-                 java.sql.ResultSet rs = stmt.executeQuery("PRAGMA table_info(users);")) {
-                System.out.println("--- USERS TABLE SCHEMA ---");
-                while (rs.next()) {
-                    System.out.println("Column: " + rs.getString("name"));
-                }
-                System.out.println("--------------------------");
-            } catch (Exception e) {
-                System.out.println("--- FAILED TO READ SCHEMA: " + e.getMessage());
-            }
-            
-            System.out.println("[DB] Enabling PRAGMA foreign_keys = ON and other pragmas.");
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("PRAGMA foreign_keys = ON");
                 stmt.execute("PRAGMA journal_mode = WAL");
@@ -182,7 +157,6 @@ public class DatabaseConnection {
 
     private static void ensureSchema(String dbPath) {
         Path target = Paths.get(dbPath);
-        System.out.println("[DB] Starting schema verification for: " + target);
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
@@ -228,29 +202,79 @@ public class DatabaseConnection {
                 }
             }
 
-            if (!columnExists(conn, "dining_tables", "base_price")) {
+            if (!columnExists(conn, "reservations", "contact_email")) {
                 try (Statement stmt = conn.createStatement()) {
-                    stmt.execute("ALTER TABLE dining_tables ADD COLUMN base_price REAL NOT NULL DEFAULT 0.0");
+                    stmt.execute("ALTER TABLE reservations ADD COLUMN contact_email TEXT");
                     migrated = true;
-                    System.out.println("[DB] Added missing dining_tables.base_price column");
+                    System.out.println("[DB] Added missing reservations.contact_email column");
                 }
             }
 
-            if (!columnExists(conn, "reservations", "reservation_fee")) {
+            if (!columnExists(conn, "reservations", "contact_phone")) {
                 try (Statement stmt = conn.createStatement()) {
-                    stmt.execute("ALTER TABLE reservations ADD COLUMN reservation_fee REAL NOT NULL DEFAULT 0.0");
+                    stmt.execute("ALTER TABLE reservations ADD COLUMN contact_phone TEXT");
                     migrated = true;
-                    System.out.println("[DB] Added missing reservations.reservation_fee column");
+                    System.out.println("[DB] Added missing reservations.contact_phone column");
+                }
+            }
+
+            // Ensure users table has contact/address columns used by auth servlet
+            if (!columnExists(conn, "users", "phone")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN phone TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.phone column");
+                }
+            }
+            if (!columnExists(conn, "users", "address")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN address TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.address column");
+                }
+            }
+            if (!columnExists(conn, "users", "address2")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN address2 TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.address2 column");
+                }
+            }
+            if (!columnExists(conn, "users", "city")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN city TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.city column");
+                }
+            }
+            if (!columnExists(conn, "users", "state")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN state TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.state column");
+                }
+            }
+            if (!columnExists(conn, "users", "postal_code")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN postal_code TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.postal_code column");
+                }
+            }
+
+            if (!columnExists(conn, "orders", "customer_email")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE orders ADD COLUMN customer_email TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing orders.customer_email column");
                 }
             }
 
             if (!migrated) {
-                System.out.println("[DB] Schema verification completed. No migrations applied.");
                 return;
             }
-            System.out.println("[DB] Schema verification completed. Migrations applied.");
         } catch (Exception e) {
-            System.out.println("[DB] Schema verification failed (" + e.getMessage() + "). Triggering backup and rebuild from schema.sql.");
+            System.out.println("[DB] Schema verification failed (" + e.getMessage() + "). Rebuilding from schema.sql");
             backupAndRebuild(target);
         }
     }

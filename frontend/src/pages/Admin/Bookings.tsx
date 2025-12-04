@@ -1,4 +1,3 @@
-// frontend/src/pages/Bookings.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient, type Reservation, type HistoryResult, type DiningTable } from '../../api/client';
 import { CalendarIcon, CheckIcon, ChevronDownIcon, LinkIcon, UserGroupIcon } from '@heroicons/react/20/solid';
@@ -13,7 +12,6 @@ type BookingSettings = {
   daysOpen: { [k: string]: boolean };
   maxDaysOut: number;
   reservationLengthMinutes: number;
-  // fixed 30min slots
 };
 
 const DEFAULT_SETTINGS: BookingSettings = {
@@ -46,7 +44,6 @@ function parseTimeToParts(t: string) {
 
 function combineDateTimeISO(date: string, time: string) {
   if (!date || !time) return '';
-  // create local datetime and return ISO
   const d = new Date(`${date}T${time}:00`);
   return d.toISOString();
 }
@@ -93,18 +90,9 @@ export default function Bookings() {
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false); // toggles settings panel
+  const [showSettings, setShowSettings] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | Reservation['status']>('all');
 
-  const tableNameById = useMemo(() => {
-    const map: Record<string, string> = {};
-    tables.forEach(t => {
-      map[String(t.tableId)] = t.name || `Table ${t.tableId}`;
-    });
-    return map;
-  }, [tables]);
-
-  // load reservations + settings on mount
   useEffect(() => { loadReservations(); loadSettings(); loadTables(); }, []);
 
   async function loadTables() {
@@ -116,17 +104,15 @@ export default function Bookings() {
       }
     } catch (err) {
       console.warn('Failed to load tables', err);
-      setTables([]);
+      setTables([]); 
     }
   }
 
   async function loadReservations() {
     try {
       setLoading(true);
-      // Always load the live list to reflect newest saves
       const raw = await apiClient.getReservations();
       setReservations(raw ?? []);
-      // Try to also load history metadata if available
       try {
         const hist = await apiClient.getReservationHistory({ pageSize: 50 });
         setHistoryMeta(hist ?? null);
@@ -144,7 +130,6 @@ export default function Bookings() {
   async function loadSettings() {
     try {
       setSettingsLoading(true);
-      // prefer API if available
       const ac: any = apiClient;
       if (ac && typeof ac.getBookingSettings === 'function') {
         try {
@@ -156,7 +141,6 @@ export default function Bookings() {
           setSettings(local ? JSON.parse(local) : DEFAULT_SETTINGS);
         }
       } else {
-        // fallback to localStorage
         const local = localStorage.getItem(LOCAL_SETTINGS_KEY);
         setSettings(local ? JSON.parse(local) : DEFAULT_SETTINGS);
       }
@@ -329,7 +313,7 @@ export default function Bookings() {
     statusFilter === 'all' ? list : list.filter(r => r.status === statusFilter);
 
   function exportCSV() {
-    const header = ['ID','Customer ID','Table','Start Time','End Time','Party Size','Status','Notes'];
+    const header = ['ID','Customer ID','Table ID','Start Time','End Time','Party Size','Status','Notes'];
     const list = (tab === 'history' ? historyReservations : currentReservations);
     const lines = list.map(r => [
       r.reservationId ?? '',
@@ -663,7 +647,7 @@ export default function Bookings() {
                     {r.userId ? `User ${r.userId}` : 'Guest'}
                     {r.guestName ? ` · ${r.guestName}` : ''}
                   </td>
-                  <td className="px-3 py-2">{tableNameById[String(r.tableId ?? '')] ?? `Table ${r.tableId}`}</td>
+                  <td className="px-3 py-2">Table {r.tableId}</td>
                   <td className="px-3 py-2">
                     {formatDate(r.startUtc)}<br/>to {formatDate(r.endUtc)}
                   </td>

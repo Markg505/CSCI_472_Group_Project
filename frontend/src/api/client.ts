@@ -1,5 +1,5 @@
 const BASE = (import.meta as any)?.env?.BASE_URL || '/';
-const API_BASE = `${BASE}api`;
+export const API_BASE = `${BASE}api`;
 
 const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
 const MAX_HISTORY_PAGE_SIZE = 100;
@@ -11,7 +11,6 @@ export interface User {
   fullName: string;
   email: string;
   phone?: string;
-  profileImageUrl?: string;
   address?: string;
   address2?: string;
   city?: string;
@@ -23,15 +22,17 @@ export interface DiningTable {
   tableId: string;
   name: string;
   capacity: number;
-  pos_x?: number;
-  pos_y?: number;
   basePrice?: number;
+  posX?: number;
+  posY?: number;
 }
 
 export interface Reservation {
   reservationId?: string;
   userId?: string;
   guestName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   tableId: string;
   startUtc: string;
   endUtc: string;
@@ -39,7 +40,6 @@ export interface Reservation {
   status?: 'pending' | 'confirmed' | 'cancelled' | 'no_show';
   notes?: string;
   createdUtc?: string;
-  reservationFee?: number;
 }
 
 export interface MenuItem {
@@ -96,6 +96,7 @@ export interface Inventory {
 
 export interface Order {
   orderId?: string;
+  orderNumber?: string;
   userId?: string;
   source: 'web' | 'phone' | 'walkin';
   status: 'cart' | 'placed' | 'paid' | 'cancelled';
@@ -107,6 +108,7 @@ export interface Order {
   orderItems?: OrderItem[];
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
   deliveryAddress?: string;
   deliveryAddress2?: string;
   deliveryCity?: string;
@@ -252,18 +254,6 @@ export interface BookingSettings {
   slotIntervalMinutes?: number;     
 }
 
-export interface ProfileUpdatePayload {
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  profileImageUrl?: string;
-  address?: string;
-  address2?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-}
-
 class ApiClient {
   private baseURL = API_BASE;
 
@@ -283,19 +273,12 @@ class ApiClient {
         localStorage.removeItem('rbos_cart_token');
       }
     } catch {
-      // ignore storage errors
     }
   }
 
   private boundedPageSize(requested?: number) {
     if (!requested || requested < 1) return 20;
     return Math.min(requested, MAX_HISTORY_PAGE_SIZE);
-  }
-
-  private normalizeTableCoords<T extends { pos_x?: number; pos_y?: number; posX?: number; posY?: number }>(t: T) {
-    const pos_x = t.pos_x ?? (t as any).posX ?? 0;
-    const pos_y = t.pos_y ?? (t as any).posY ?? 0;
-    return { ...t, pos_x, pos_y };
   }
 
   private historyQuery(params: Record<string, string | number | undefined>) {
@@ -363,16 +346,8 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
     await this.request(`/users/${userId}`, { method: 'DELETE' });
   }
 
-  async updateMyProfile(userId: string, payload: ProfileUpdatePayload): Promise<User> {
-    return this.request(`/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  }
-
   async getTables(): Promise<DiningTable[]> {
-    const data = await this.request('/tables');
-    return Array.isArray(data) ? data.map(t => this.normalizeTableCoords(t)) : [];
+    return this.request('/tables');
   }
     async getsInventory(): Promise<InventoryItem[]> {
     return this.request('/inventory');
@@ -380,8 +355,7 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
 
   async getAvailableTables(startUtc: string, endUtc: string, partySize: number): Promise<DiningTable[]> {
     const params = new URLSearchParams({ startUtc, endUtc, partySize: partySize.toString() });
-    const data = await this.request(`/reservations/available-tables?${params}`);
-    return Array.isArray(data) ? data.map(t => this.normalizeTableCoords(t)) : [];
+    return this.request(`/reservations/available-tables?${params}`);
   }
 
   async createTable(table: Omit<DiningTable, 'tableId'>): Promise<DiningTable> {
@@ -391,30 +365,16 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
   async updateTable(table: DiningTable): Promise<DiningTable> {
     return this.request(`/tables/${table.tableId}`, { method: 'PUT', body: JSON.stringify(table) });
   }
-
-  async updateTablePosition(tableId: string, x: number, y: number): Promise<void> {
-    await this.request(`/tables/${tableId}/position`, {
-      method: 'PUT',
-      body: JSON.stringify({ x, y }),
-    });
-  }
-
-  async getMapImageUrl(): Promise<{ url: string }> {
-    return this.request('/tables/config/map-image');
-  }
-
-  async setMapImageUrl(url: string): Promise<void> {
-    await this.request('/tables/config/map-image', {
-      method: 'PUT',
-      body: JSON.stringify({ url }),
-    });
-  }
   async deleteTable(tableId: string): Promise<void> {
     await this.request(`/tables/${tableId}`, { method: 'DELETE' });
   }
 
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
+  }
+
+  async getReservationById(reservationId: string): Promise<Reservation> {
+    return this.request(`/reservations/${encodeURIComponent(reservationId)}`);
   }
 
   async getReservationHistory(params: { status?: string; startUtc?: string; endUtc?: string; userId?: string; page?: number; pageSize?: number; }): Promise<HistoryResult<Reservation>> {
@@ -657,7 +617,6 @@ async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings>
   }
 }
 
-// Minimal CSV parser for audit log export (handles quoted commas)
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = '';

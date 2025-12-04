@@ -33,7 +33,6 @@ export function ImageUploadComponent({
       return;
     }
 
-    // Basic URL validation
     try {
       new URL(imageUrl);
     } catch {
@@ -77,7 +76,6 @@ export function ImageUploadComponent({
   return (
     <div className="space-y-4 p-4 border border-white/10 rounded-lg bg-card">
       <div className="flex items-start gap-4">
-        {/* Image Preview */}
         <div className="flex-shrink-0">
           <div className="w-24 h-24 border border-white/20 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
             {previewUrl ? (
@@ -95,7 +93,6 @@ export function ImageUploadComponent({
           </div>
         </div>
 
-        {/* URL Input and Controls */}
         <div className="flex-1 space-y-3">
           <div>
             <label htmlFor={`image-url-${itemId}`} className="block text-sm font-medium mb-1">

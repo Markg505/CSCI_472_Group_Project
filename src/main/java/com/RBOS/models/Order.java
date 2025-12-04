@@ -2,6 +2,9 @@ package com.RBOS.models;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Order {
     private String orderId;
     private String userId;
@@ -15,6 +18,7 @@ public class Order {
     private String cartToken;
     private String customerName;
     private String customerPhone;
+    private String customerEmail;
     private String deliveryAddress;
     private String deliveryAddress2;
     private String deliveryCity;
@@ -205,5 +209,13 @@ public class Order {
 
     public void setDeliveryInstructions(String deliveryInstructions) {
         this.deliveryInstructions = deliveryInstructions;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
     }
 }

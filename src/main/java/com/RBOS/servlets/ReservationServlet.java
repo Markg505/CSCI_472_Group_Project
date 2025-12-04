@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 @WebServlet("/api/reservations/*")
 public class ReservationServlet extends HttpServlet {
@@ -109,6 +112,9 @@ public class ReservationServlet extends HttpServlet {
 
         try {
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
+            if (reservation.getUserId() != null && reservation.getUserId().isBlank()) {
+                reservation.setUserId(null); // normalize empty user ids to null to avoid FK issues
+            }
             if (reservation.getTableId() == null || reservation.getTableId().isBlank()) {
                 List<DiningTable> tables = diningTableDAO.getAllTables();
                 if (tables.isEmpty()) {
@@ -116,6 +122,11 @@ public class ReservationServlet extends HttpServlet {
                     return;
                 }
                 reservation.setTableId(tables.get(0).getTableId());
+            }
+            if (!reservationDAO.isTableAvailable(reservation.getTableId(), reservation.getStartUtc(),
+                    reservation.getEndUtc(), null)) {
+                response.sendError(HttpServletResponse.SC_CONFLICT, "Table is already booked for that time range");
+                return;
             }
             // drop unknown users to avoid FK failures
             if (reservation.getUserId() != null && !reservation.getUserId().isBlank()) {
@@ -146,24 +157,29 @@ public class ReservationServlet extends HttpServlet {
 
                     // Get user details for email
                     UserDAO userDAO = new UserDAO(getServletContext());
-                    User user = null;
-                    if (reservation.getUserId() != null) {
-                        user = userDAO.getUserById(reservation.getUserId());
+                    User user = reservation.getUserId() != null
+                            ? userDAO.getUserById(reservation.getUserId())
+                            : null;
+
+                    String targetEmail = null;
+                    if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+                        targetEmail = user.getEmail();
+                    } else if (reservation.getContactEmail() != null && !reservation.getContactEmail().isBlank()) {
+                        targetEmail = reservation.getContactEmail();
                     }
 
-                    if (user != null && user.getEmail() != null) {
+                    if (targetEmail != null) {
                         // Get table details
                         DiningTableDAO tableDAO = new DiningTableDAO(getServletContext());
                         DiningTable table = tableDAO.getTableById(reservation.getTableId());
 
-                        String reservationDate = new java.text.SimpleDateFormat("MMMM dd, yyyy")
-                                .format(new java.util.Date(reservation.getStartUtc()));
-                        String reservationTime = new java.text.SimpleDateFormat("h:mm a")
-                                .format(new java.util.Date(reservation.getStartUtc()));
+                        String reservationDate = formatLocalDate(reservation.getStartUtc());
+                        String reservationTime = formatLocalTime(reservation.getStartUtc());
 
                         emailService.sendReservationConfirmation(
-                                user.getEmail(),
-                                user.getFullName(),
+                                targetEmail,
+                                user != null ? user.getFullName()
+                                        : (reservation.getGuestName() != null ? reservation.getGuestName() : "Guest"),
                                 reservationDate,
                                 reservationTime,
                                 reservation.getPartySize(),
@@ -345,6 +361,9 @@ public class ReservationServlet extends HttpServlet {
             }
 
             Reservation reservation = objectMapper.readValue(request.getReader(), Reservation.class);
+            if (reservation.getUserId() != null && reservation.getUserId().isBlank()) {
+                reservation.setUserId(null); // normalize empty user ids to null to avoid FK issues
+            }
             if (reservation.getUserId() != null && !reservation.getUserId().isBlank()) {
                 try {
                     UserDAO userDAO = new UserDAO(getServletContext());
@@ -358,6 +377,13 @@ public class ReservationServlet extends HttpServlet {
             }
             if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank()) && reservation.getUserId() == null) {
                 reservation.setGuestName("Guest");
+            }
+            if (reservation.getTableId() != null && reservation.getStartUtc() != null && reservation.getEndUtc() != null) {
+                if (!reservationDAO.isTableAvailable(reservation.getTableId(), reservation.getStartUtc(),
+                        reservation.getEndUtc(), reservation.getReservationId())) {
+                    response.sendError(HttpServletResponse.SC_CONFLICT, "Table is already booked for that time range");
+                    return;
+                }
             }
             boolean success = reservationDAO.updateReservation(reservation);
 
@@ -376,6 +402,24 @@ public class ReservationServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         } catch (NumberFormatException e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
+    private String formatLocalDate(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("MMMM dd, yyyy"));
+        } catch (Exception e) {
+            return isoInstant;
+        }
+    }
+
+    private String formatLocalTime(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("h:mm a z"));
+        } catch (Exception e) {
+            return isoInstant;
         }
     }
 }

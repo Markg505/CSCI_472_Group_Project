@@ -10,7 +10,6 @@ import CustomerMenu from "../pages/CustomerMenu";
 import CartPage from '../pages/CartPage';
 import Orders from '../pages/Admin/Orders';
 
-// Admin
 import AdminShell from "../pages/Admin/AdminLayout";
 import Dashboard from "../pages/Admin/Dashboard";
 import Users from "../pages/Admin/Users";
@@ -34,7 +33,6 @@ export const router = createBrowserRouter(
         { path: "dashboard", element: <CustomerDashboard /> },
         { path: "menu", element: <CustomerMenu /> },
         { path: "cart", element: <CartPage /> },
-        // Admin routes
         {
           path: "admin",
           element: <AdminShell />,

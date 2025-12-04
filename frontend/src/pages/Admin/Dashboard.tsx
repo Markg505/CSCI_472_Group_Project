@@ -9,7 +9,7 @@ import {
   ClockIcon,
   ShoppingCartIcon,
   ArrowUpIcon,
-} from '@heroicons/react/20/solid'; // Removed ArrowDownIcon
+} from '@heroicons/react/20/solid';
 
 interface DashboardMetrics {
   todayReservations: number;
@@ -45,7 +45,7 @@ export default function Dashboard() {
       const [reservations, menuItems, orders, users] = await Promise.all([
         apiClient.getReservations(),
         apiClient.getActiveMenuItems(),
-        apiClient.getOrdersByStatus('all'), // Get all orders
+        apiClient.getOrdersByStatus('all'),
         (apiClient as any).listUsers ? (apiClient as any).listUsers() : Promise.resolve([])
       ]);
 
@@ -69,7 +69,6 @@ export default function Dashboard() {
         totalUsers: Array.isArray(users) ? users.length : 0
       });
 
-      // Recent activity (last 5 events)
       const activity = [
         ...reservations.slice(0, 3).map((r: any) => ({
           type: 'reservation' as const,

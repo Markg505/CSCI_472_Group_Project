@@ -9,6 +9,10 @@ import jakarta.servlet.ServletContext;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class ReservationDAO {
     private ServletContext context;
@@ -40,7 +44,6 @@ public class ReservationDAO {
                         rs.getString("status"),
                         rs.getString("notes"),
                         rs.getString("created_utc"));
-                try { reservation.setReservationFee(rs.getDouble("reservation_fee")); } catch (Exception ignored) {}
                 reservation.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
                         : rs.getString("user_full_name"));
 
@@ -52,7 +55,8 @@ public class ReservationDAO {
     }
 
     public Reservation getReservationById(String reservationId) throws SQLException {
-        String sql = "SELECT r.*, u.full_name AS user_full_name, u.email, u.phone, dt.name as table_name, dt.capacity " +
+        String sql = "SELECT r.*, u.full_name AS user_full_name, u.email, u.phone, dt.name as table_name, dt.capacity "
+                +
                 "FROM reservations r " +
                 "LEFT JOIN users u ON r.user_id = u.user_id " +
                 "JOIN dining_tables dt ON r.table_id = dt.table_id " +
@@ -75,7 +79,6 @@ public class ReservationDAO {
                         rs.getString("status"),
                         rs.getString("notes"),
                         rs.getString("created_utc"));
-                try { r.setReservationFee(rs.getDouble("reservation_fee")); } catch (Exception ignored) {}
                 r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
                         : rs.getString("user_full_name"));
                 return r;
@@ -110,7 +113,6 @@ public class ReservationDAO {
                         rs.getString("status"),
                         rs.getString("notes"),
                         rs.getString("created_utc"));
-                try { r.setReservationFee(rs.getDouble("reservation_fee")); } catch (Exception ignored) {}
                 r.setGuestName(rs.getString("guest_name") != null ? rs.getString("guest_name")
                         : rs.getString("user_full_name"));
                 reservations.add(r);
@@ -123,29 +125,51 @@ public class ReservationDAO {
             String userId, int page, int pageSize) throws SQLException {
         List<Reservation> reservations = new ArrayList<>();
         List<String> params = new ArrayList<>();
+        int total = 0;
 
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         if (status != null && !status.isEmpty() && !"all".equalsIgnoreCase(status)) {
             where.append(" AND r.status = ?");
             params.add(status);
         }
+        if (startUtc != null && !startUtc.isEmpty()) {
+            where.append(" AND r.start_utc >= ?");
+            params.add(startUtc);
+        }
+        if (endUtc != null && !endUtc.isEmpty()) {
+            where.append(" AND r.start_utc <= ?");
+            params.add(endUtc);
+        }
         if (userId != null && !userId.isEmpty()) {
             where.append(" AND r.user_id = ?");
             params.add(userId);
         }
 
+        String countSql = "SELECT COUNT(*) FROM reservations r" + where;
         String dataSql = "SELECT r.*, dt.name as table_name, u.full_name AS user_full_name " +
                 "FROM reservations r " +
                 "JOIN dining_tables dt ON r.table_id = dt.table_id " +
                 "LEFT JOIN users u ON r.user_id = u.user_id " +
                 where +
-                " ORDER BY r.start_utc DESC";
+                " ORDER BY r.start_utc DESC LIMIT ? OFFSET ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context)) {
+            try (PreparedStatement countStmt = conn.prepareStatement(countSql)) {
+                for (int i = 0; i < params.size(); i++) {
+                    countStmt.setString(i + 1, params.get(i));
+                }
+                try (ResultSet rs = countStmt.executeQuery()) {
+                    if (rs.next()) {
+                        total = rs.getInt(1);
+                    }
+                }
+            }
             try (PreparedStatement dataStmt = conn.prepareStatement(dataSql)) {
                 for (int i = 0; i < params.size(); i++) {
                     dataStmt.setString(i + 1, params.get(i));
                 }
+                dataStmt.setInt(params.size() + 1, pageSize);
+                dataStmt.setInt(params.size() + 2, (page - 1) * pageSize);
 
                 try (ResultSet dataRs = dataStmt.executeQuery()) {
                     while (dataRs.next()) {
@@ -159,7 +183,6 @@ public class ReservationDAO {
                                 dataRs.getString("status"),
                                 dataRs.getString("notes"),
                                 dataRs.getString("created_utc"));
-                        try { r.setReservationFee(dataRs.getDouble("reservation_fee")); } catch (Exception ignored) {}
                         r.setGuestName(dataRs.getString("guest_name") != null ? dataRs.getString("guest_name")
                                 : dataRs.getString("user_full_name"));
                         reservations.add(r);
@@ -167,40 +190,53 @@ public class ReservationDAO {
                 }
             }
         }
+        return new PagedResult<>(reservations, total);
+    }
 
-        // In-Java date filtering using start_utc timestamp
-        java.time.Instant startInst = null;
-        java.time.Instant endInst = null;
-        try { if (startUtc != null && !startUtc.isEmpty()) startInst = java.time.Instant.parse(startUtc); } catch (Exception ignored) {}
-        try { if (endUtc != null && !endUtc.isEmpty()) endInst = java.time.Instant.parse(endUtc); } catch (Exception ignored) {}
+    private String generateNumericId() {
+        long n = java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L);
+        return Long.toString(n);
+    }
 
-        List<Reservation> filtered = new ArrayList<>();
-        for (Reservation r : reservations) {
-            try {
-                java.time.Instant st = java.time.Instant.parse(r.getStartUtc());
-                if (startInst != null && st.isBefore(startInst)) continue;
-                if (endInst != null && st.isAfter(endInst)) continue;
-            } catch (Exception ignored) {
-                // keep record if parse fails
-            }
-            filtered.add(r);
+    public boolean isTableAvailable(String tableId, String startUtc, String endUtc, String excludeReservationId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM reservations " +
+                "WHERE table_id = ? " +
+                "AND status IN ('pending','confirmed') " +
+                "AND NOT (end_utc <= ? OR start_utc >= ?)";
+
+        if (excludeReservationId != null) {
+            sql += " AND reservation_id <> ?";
         }
 
-        int total = filtered.size();
-        int startIndex = Math.max(0, (page - 1) * pageSize);
-        int endIndex = Math.min(total, startIndex + pageSize);
-        List<Reservation> pageItems = filtered.subList(startIndex, endIndex);
+        try (Connection conn = DatabaseConnection.getConnection(context);
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, tableId);
+            pstmt.setString(2, startUtc);
+            pstmt.setString(3, endUtc);
+            if (excludeReservationId != null) {
+                pstmt.setString(4, excludeReservationId);
+            }
 
-        return new PagedResult<>(pageItems, total);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) == 0;
+                }
+            }
+        }
+        return false;
     }
 
     public String createReservation(Reservation reservation) throws SQLException {
         String reservationId = reservation.getReservationId() != null
                 ? reservation.getReservationId()
-                : java.util.UUID.randomUUID().toString();
-        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, table_id, start_utc, end_utc, party_size, status, notes, reservation_fee) "
+                : generateNumericId();
+        String sql = "INSERT INTO reservations (reservation_id, user_id, guest_name, contact_email, contact_phone, table_id, start_utc, end_utc, party_size, status, notes) "
                 +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        if (!isTableAvailable(reservation.getTableId(), reservation.getStartUtc(), reservation.getEndUtc(), null)) {
+            return null;
+        }
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -208,13 +244,14 @@ public class ReservationDAO {
             pstmt.setString(1, reservationId);
             pstmt.setString(2, reservation.getUserId());
             pstmt.setString(3, reservation.getGuestName());
-            pstmt.setString(4, reservation.getTableId());
-            pstmt.setString(5, reservation.getStartUtc());
-            pstmt.setString(6, reservation.getEndUtc());
-            pstmt.setInt(7, reservation.getPartySize());
-            pstmt.setString(8, reservation.getStatus() != null ? reservation.getStatus() : "pending");
-            pstmt.setString(9, reservation.getNotes());
-            pstmt.setDouble(10, reservation.getReservationFee() != null ? reservation.getReservationFee() : 0.0);
+            pstmt.setString(4, reservation.getContactEmail());
+            pstmt.setString(5, reservation.getContactPhone());
+            pstmt.setString(6, reservation.getTableId());
+            pstmt.setString(7, reservation.getStartUtc());
+            pstmt.setString(8, reservation.getEndUtc());
+            pstmt.setInt(9, reservation.getPartySize());
+            pstmt.setString(10, reservation.getStatus() != null ? reservation.getStatus() : "pending");
+            pstmt.setString(11, reservation.getNotes());
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -227,17 +264,22 @@ public class ReservationDAO {
 
                         // Get email from user (you're logged in)
                         String userEmail = getUserEmailById(reservation.getUserId());
-                        if (userEmail != null && !userEmail.isEmpty()) {
+                        String targetEmail = (userEmail != null && !userEmail.isEmpty())
+                                ? userEmail
+                                : (reservation.getContactEmail() != null && !reservation.getContactEmail().isBlank()
+                                        ? reservation.getContactEmail()
+                                        : null);
+                        if (targetEmail != null && !targetEmail.isEmpty()) {
                             String emailBody = EmailTemplates.getReservationConfirmationTemplate(
                                     reservation.getGuestName() != null ? reservation.getGuestName() : "Valued Guest",
-                                    reservation.getStartUtc(),
-                                    reservation.getStartUtc(),
+                                    formatLocalDate(reservation.getStartUtc()),
+                                    formatLocalTime(reservation.getStartUtc()),
                                     reservation.getPartySize(),
                                     "Table " + reservation.getTableId(),
                                     reservationId);
 
                             emailService.sendEmailAsync(
-                                    userEmail,
+                                    targetEmail,
                                     "Reservation Confirmed - " + reservationId,
                                     emailBody);
                         }
@@ -256,6 +298,11 @@ public class ReservationDAO {
     public boolean updateReservation(Reservation reservation) throws SQLException {
         String sql = "UPDATE reservations SET user_id = ?, guest_name = ?, table_id = ?, start_utc = ?, end_utc = ?, " +
                 "party_size = ?, status = ?, notes = ? WHERE reservation_id = ?";
+
+        if (!isTableAvailable(reservation.getTableId(), reservation.getStartUtc(), reservation.getEndUtc(),
+                reservation.getReservationId())) {
+            return false;
+        }
 
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -295,8 +342,8 @@ public class ReservationDAO {
                             EmailService emailService = new EmailService();
                             String emailBody = EmailTemplates.getReservationUpdateTemplate(
                                     reservation.getGuestName(),
-                                    reservation.getStartUtc(),
-                                    reservation.getStartUtc(),
+                                    formatLocalDate(reservation.getStartUtc()),
+                                    formatLocalTime(reservation.getStartUtc()),
                                     status,
                                     reservationId);
                             emailService.sendEmailAsync(
@@ -337,6 +384,24 @@ public class ReservationDAO {
 
             pstmt.setString(1, reservationId);
             return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    private String formatLocalDate(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("MMMM dd, yyyy"));
+        } catch (Exception e) {
+            return isoInstant;
+        }
+    }
+
+    private String formatLocalTime(String isoInstant) {
+        try {
+            ZonedDateTime zdt = Instant.parse(isoInstant).atZone(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("h:mm a z"));
+        } catch (Exception e) {
+            return isoInstant;
         }
     }
 }

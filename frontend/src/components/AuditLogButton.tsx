@@ -10,7 +10,6 @@ export default function AuditLogButton({ entityType, label = "View Change Log" }
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  // Only show button for admin users
   if (!user || (user as any).role !== "admin") {
     return null;
   }
@@ -26,7 +25,6 @@ export default function AuditLogButton({ entityType, label = "View Change Log" }
         if (response.status === 403) {
           alert("Access denied. Admin privileges required.");
         } else {
-          // Try to get error message from response
           try {
             const errorData = await response.json();
             alert("Error: " + (errorData.error || "Failed to export audit log. Status " + response.status));

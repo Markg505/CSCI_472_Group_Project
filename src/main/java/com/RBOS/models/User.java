@@ -8,7 +8,6 @@ public class User {
     private String fullName;
     private String email;
     private String phone;
-    private String profileImageUrl;
     private String address;
     private String address2;
     private String city;
@@ -17,47 +16,18 @@ public class User {
 
     @JsonIgnore
     private String passwordHash; // BCrypt hashed password
-    public User(String userId, String role, String fullName, String email, String phone, String passwordHash, String profileImageUrl,
-                String address, String address2, String city, String state, String postalCode) {
-        this.userId = userId;
-        this.role = role;
-        this.fullName = fullName;
-        this.email = email;
-        this.phone = phone;
-        this.passwordHash = passwordHash;
-        this.profileImageUrl = profileImageUrl;
-        this.address = address;
-        this.address2 = address2;
-        this.city = city;
-        this.state = state;
-        this.postalCode = postalCode;
-    }
-    public String getProfileImageUrl() {
-        return profileImageUrl;
-    }
-
-    public void setProfileImageUrl(String profileImageUrl) {
-        this.profileImageUrl = profileImageUrl;
-    }
 
     private transient String password; // plaintext for create/update only
 
     public User() {
     }
 
-    public User(String userId, String role, String fullName, String email, String phone, String profileImageUrl,
-                String address, String address2, String city, String state, String postalCode) {
+    public User(String userId, String role, String fullName, String email, String phone) {
         this.userId = userId;
         this.role = role;
         this.fullName = fullName;
         this.email = email;
         this.phone = phone;
-        this.profileImageUrl = profileImageUrl;
-        this.address = address;
-        this.address2 = address2;
-        this.city = city;
-        this.state = state;
-        this.postalCode = postalCode;
     }
 
     public User(String userId, String role, String fullName, String email, String phone, String passwordHash) {
@@ -67,12 +37,6 @@ public class User {
         this.email = email;
         this.phone = phone;
         this.passwordHash = passwordHash;
-        this.profileImageUrl = null;
-        this.address = null;
-        this.address2 = null;
-        this.city = null;
-        this.state = null;
-        this.postalCode = null;
     }
 
     public String getUserId() {
@@ -115,22 +79,6 @@ public class User {
         this.phone = phone;
     }
 
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     public String getAddress() {
         return address;
     }
@@ -169,5 +117,21 @@ public class User {
 
     public void setPostalCode(String postalCode) {
         this.postalCode = postalCode;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

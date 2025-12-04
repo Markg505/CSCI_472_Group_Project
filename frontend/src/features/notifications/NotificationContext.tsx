@@ -36,7 +36,7 @@ const notificationReducer = (state: NotificationState, action: NotificationActio
     case 'SET_STATE':
       return action.payload;
     case 'ADD_NOTIFICATION': {
-      const newNotifications = [action.payload, ...state.notifications].slice(0, 50); // Keep last 50
+      const newNotifications = [action.payload, ...state.notifications].slice(0, 50);
       const unreadCount = newNotifications.filter(n => !n.read).length;
       return { notifications: newNotifications, unreadCount };
     }
@@ -105,7 +105,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       localStorage.setItem(STORAGE_KEY, serialized);
     } catch {
-      // ignore storage errors
     }
   }, [state]);
 
@@ -120,7 +119,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           }));
           dispatch({ type: 'SET_STATE', payload: { notifications, unreadCount: notifications.filter(n => !n.read).length } });
         } catch {
-          // ignore parsing errors
         }
       }
     };
@@ -140,7 +138,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     dispatch({ type: 'ADD_NOTIFICATION', payload: newNotification });
   };
 
-  // Handle WebSocket messages
   useEffect(() => {
     if (lastMessage) {
       switch (lastMessage.type) {

@@ -1,4 +1,3 @@
-// src/components/UserMenu.tsx
 import React from "react";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { Link, useNavigate } from "react-router-dom";

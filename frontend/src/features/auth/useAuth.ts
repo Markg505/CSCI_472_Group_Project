@@ -1,16 +1,50 @@
 import { createContext, useCallback, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
-import { apiClient, type LoginResponse, type User as ApiClientUser, type ProfileUpdatePayload } from '../../api/client';
+import { apiClient, type LoginResponse, API_BASE } from '../../api/client';
 
 export const AUTH_DEBUG_TAG = "useAuth";
 
-export type User = ApiClientUser;
+export type User = {
+  userId?: string;
+  id?: string;
+  email: string;
+  role: string;
+  name?: string;
+  fullName?: string;
+  full_name?: string;
+  avatarUrl?: string;
+  address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+};
 
 export type AuthContextType = {
   user: User | null;
   setUser: (u: User | null) => void;
   loginWithCredentials: (email: string, password: string) => Promise<void>;
-  signup: (data: { full_name?: string; name?: string; email: string; phone?: string; password: string }) => Promise<void>;
-  updateProfile: (data: ProfileUpdatePayload) => Promise<User>;
+  signup: (data: {
+    full_name?: string;
+    name?: string;
+    email: string;
+    phone?: string;
+    password: string;
+    address: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    address2?: string;
+  }) => Promise<void>;
+  updateProfile: (data: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    address: string;
+    address2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  }) => Promise<User>;
   changePassword: (data: { currentPassword: string; newPassword: string }) => Promise<void>;
   refreshProfile: () => Promise<User | null>;
   logout: () => Promise<void>;
@@ -22,18 +56,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const storage = sessionStorage;
 
+const AUTH_BASE = `${API_BASE}/auth`;
+
 async function extractMessage(res: Response, fallback: string): Promise<string> {
   try {
     const body = await res.clone().json();
     if (body?.message) return body.message as string;
   } catch {
-    // ignore
   }
   try {
     const text = await res.text();
     if (text) return text;
   } catch {
-    // ignore
   }
   return fallback;
 }
@@ -45,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const saveMe = useCallback((me: User | null) => {
     if (me) {
       try { storage.setItem("rbos_user", JSON.stringify(me)); } catch {
-        // Ignore storage errors (e.g., quota exceeded)
       }
     } else {
       storage.removeItem("rbos_user");
@@ -56,14 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = useCallback(async (): Promise<User | null> => {
     try {
-      const r = await fetch("/RBOS/api/auth/me", { credentials: "include" });
+      const r = await fetch(`${AUTH_BASE}/me`, { credentials: "include" });
       if (r.ok) {
         const me = (await r.json()) as User;
         saveMe(me);
         return me;
       }
     } catch {
-      // Ignore fetch errors - user is not authenticated
     }
 
     saveMe(null);
@@ -74,14 +106,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
 
     const raw = storage.getItem("rbos_user");
-    if (raw) { try { setUser(JSON.parse(raw)); } catch { /* Ignore parse errors */ } }
+    if (raw) { try { setUser(JSON.parse(raw)); } catch { } }
 
 
     (async () => { await fetchMe(); })();
   }, [fetchMe]);
 
   const loginWithCredentials = async (email: string, password: string) => {
-    const res = await fetch("/RBOS/api/auth/login", {
+    const res = await fetch(`${AUTH_BASE}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -90,7 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) {
       let msg = "Login failed";
       try { const j = await res.json(); if (j?.message) msg = j.message; } catch {
-        // Ignore JSON parse errors - use default message
       }
       throw new Error(msg);
     }
@@ -104,24 +135,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           sessionStorage.setItem('rbos_cart_conflicts', JSON.stringify(loginDetails.cart.conflicts));
         } catch {
-          // ignore session storage errors
         }
       }
     } catch {
-      // login response body not required
     }
     const me = await fetchMe();
     if (!me) throw new Error("Could not load user profile after login.");
   };
 
-  const signup = async (data: { full_name?: string; name?: string; email: string; phone?: string; password: string }) => {
+  const signup = async (data: {
+    full_name?: string;
+    name?: string;
+    email: string;
+    phone?: string;
+    password: string;
+    address: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    address2?: string;
+  }) => {
     const payload = {
       full_name: data.full_name ?? data.name ?? "",
       email: data.email,
       phone: data.phone ?? "",
       password: data.password,
+      address: data.address,
+      address2: data.address2 ?? "",
+      city: data.city,
+      state: data.state,
+      postalCode: data.postalCode,
     };
-    const res = await fetch("/RBOS/api/auth/register", {
+    const res = await fetch(`${AUTH_BASE}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -135,17 +180,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchMe();
   };
 
-  const updateProfile = async (data: ProfileUpdatePayload) => {
-    if (!user?.userId) {
-      throw new Error("User not authenticated");
+  const updateProfile = async (data: { fullName: string; email: string; phone?: string; address: string; address2?: string; city: string; state: string; postalCode: string }) => {
+    const res = await fetch(`${AUTH_BASE}/me`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone ?? "",
+        address: data.address,
+        address2: data.address2 ?? "",
+        city: data.city,
+        state: data.state,
+        postalCode: data.postalCode,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(await extractMessage(res, "Profile update failed"));
     }
-    const updated = await apiClient.updateMyProfile(user.userId, data);
+
+    const updated = (await res.json()) as User;
     saveMe(updated);
     return updated;
   };
 
   const changePassword = async (data: { currentPassword: string; newPassword: string }) => {
-    const res = await fetch("/RBOS/api/auth/me/password", {
+    const res = await fetch(`${AUTH_BASE}/me/password`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -163,8 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = async () => fetchMe();
 
   const logout = async () => {
-    try { await fetch("/RBOS/api/auth/logout", { method: "POST", credentials: "include" }); } catch {
-      // Ignore logout errors - proceed with local cleanup
+    try { await fetch(`${AUTH_BASE}/logout`, { method: "POST", credentials: "include" }); } catch {
     }
     saveMe(null);
   };

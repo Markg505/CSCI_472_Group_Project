@@ -3,6 +3,7 @@ package com.RBOS.services;
 import com.RBOS.models.Inventory;
 import com.RBOS.models.MenuItem;
 import com.RBOS.models.OrderItem;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,11 +12,13 @@ import java.util.Map;
 
 public class CartMergeService {
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MergeItem {
         public String itemId;
         public Integer qty;
         public Double unitPrice;
         public String name;
+        public String notes;
     }
 
     public static class Conflict {
@@ -65,28 +68,36 @@ public class CartMergeService {
     }
 
     public MergeResult merge(List<MergeItem> incoming, List<OrderItem> existing, Map<String, Inventory> inventoryByItem) {
+        // Key on item + notes so distinct customizations are kept separate
         Map<String, Integer> requestedQty = new HashMap<>();
         Map<String, Double> incomingPrice = new HashMap<>();
         Map<String, String> incomingName = new HashMap<>();
+        Map<String, String> incomingNotes = new HashMap<>();
 
         for (OrderItem item : existing) {
-            requestedQty.put(item.getItemId(), item.getQty());
+            String key = key(item.getItemId(), item.getNotes());
+            requestedQty.put(key, item.getQty());
             if (item.getUnitPrice() != null) {
-                incomingPrice.put(item.getItemId(), item.getUnitPrice());
+                incomingPrice.put(key, item.getUnitPrice());
             }
             if (item.getMenuItem() != null) {
-                incomingName.put(item.getItemId(), item.getMenuItem().getName());
+                incomingName.put(key, item.getMenuItem().getName());
             }
+            incomingNotes.put(key, item.getNotes());
         }
 
         for (MergeItem item : incoming) {
-            int nextQty = (item.qty != null ? item.qty : 0) + requestedQty.getOrDefault(item.itemId, 0);
-            requestedQty.put(item.itemId, nextQty);
+            String key = key(item.itemId, item.notes);
+            int nextQty = (item.qty != null ? item.qty : 0) + requestedQty.getOrDefault(key, 0);
+            requestedQty.put(key, nextQty);
             if (item.unitPrice != null) {
-                incomingPrice.put(item.itemId, item.unitPrice);
+                incomingPrice.put(key, item.unitPrice);
             }
             if (item.name != null) {
-                incomingName.put(item.itemId, item.name);
+                incomingName.put(key, item.name);
+            }
+            if (item.notes != null) {
+                incomingNotes.put(key, item.notes);
             }
         }
 
@@ -96,13 +107,15 @@ public class CartMergeService {
         List<Conflict> mergedQuantities = new ArrayList<>();
 
         for (Map.Entry<String, Integer> entry : requestedQty.entrySet()) {
-            String itemId = entry.getKey();
+            String key = entry.getKey();
+            String itemId = key.split("\\|", 2)[0];
             int desired = entry.getValue();
             Inventory inventory = inventoryByItem.get(itemId);
 
-            String itemName = incomingName.getOrDefault(itemId, inventory != null && inventory.getMenuItem() != null
+            String itemName = incomingName.getOrDefault(key, inventory != null && inventory.getMenuItem() != null
                     ? inventory.getMenuItem().getName()
                     : "");
+            String noteVal = incomingNotes.getOrDefault(key, null);
 
             if (inventory == null || Boolean.FALSE.equals(inventory.getActive()) || inventory.getQtyOnHand() == null || inventory.getQtyOnHand() <= 0) {
                 dropped.add(new Conflict(itemId, itemName, "out_of_stock", desired, 0));
@@ -121,7 +134,7 @@ public class CartMergeService {
 
             int existingQty = 0;
             for (OrderItem item : existing) {
-                if (item.getItemId().equals(itemId)) {
+                if (item.getItemId().equals(itemId) && safeEq(item.getNotes(), noteVal)) {
                     existingQty = item.getQty();
                     break;
                 }
@@ -130,13 +143,14 @@ public class CartMergeService {
                 mergedQuantities.add(new Conflict(itemId, itemName, "merged", desired, allowed));
             }
 
-            double price = resolvePrice(inventory, incomingPrice.get(itemId));
+            double price = resolvePrice(inventory, incomingPrice.get(key));
 
             OrderItem mergedItem = new OrderItem();
             mergedItem.setItemId(itemId);
             mergedItem.setQty(allowed);
             mergedItem.setUnitPrice(price);
             mergedItem.setLineTotal(price * allowed);
+            mergedItem.setNotes(noteVal);
             if (inventory != null && inventory.getMenuItem() != null) {
                 MenuItem m = new MenuItem();
                 m.setItemId(itemId);
@@ -158,5 +172,13 @@ public class CartMergeService {
             return fallback;
         }
         return 0.0;
+    }
+
+    private String key(String itemId, String notes) {
+        return (itemId != null ? itemId : "") + "|" + (notes != null ? notes : "");
+    }
+
+    private boolean safeEq(String a, String b) {
+        return (a == null && b == null) || (a != null && a.equals(b));
     }
 }

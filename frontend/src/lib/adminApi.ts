@@ -68,7 +68,7 @@ export type Booking = {
   name: string;
   phone: string;
   partySize: number;
-  datetime: string;   // ISO string
+  datetime: string;
   notes?: string;
   status: BookingStatus;
 };
@@ -112,9 +112,6 @@ function todayISO(): string {
 
 function safeRandomId(): string {
   try {
-    // crypto.randomUUID is not available in some browsers (e.g., older WebView)
-    // fall back to a timestamp/random-based id.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c: any = (globalThis as any).crypto;
     if (c && typeof c.randomUUID === "function") {
       return c.randomUUID().toString();
@@ -192,7 +189,6 @@ function save() {
   localStorage.setItem(KEY, JSON.stringify(INVENTORY));
 }
 
-// --- CRUD API (fake) ---
 export async function listInventory(): Promise<InventoryItem[]> {
   return structuredClone(INVENTORY);
 }
