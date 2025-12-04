@@ -23,7 +23,7 @@ public class MenuItemDAO {
 
     public List<MenuItem> getAllMenuItems() throws SQLException {
         List<MenuItem> menuItems = new ArrayList<>();
-        String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock FROM menu_items ORDER BY item_id";
+        String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock, available_qty FROM menu_items ORDER BY item_id";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -43,6 +43,7 @@ public class MenuItemDAO {
                         rs.getString("dietary_tags")
                 );
                 item.setOutOfStock(outOfStock);
+                item.setAvailableQty((Integer) rs.getObject("available_qty"));
                 menuItems.add(item);
             }
         }
@@ -71,6 +72,7 @@ public class MenuItemDAO {
                         rs.getString("dietary_tags")
                 );
                 item.setOutOfStock(outOfStock);
+                item.setAvailableQty((Integer) rs.getObject("available_qty"));
                 menuItems.add(item);
             }
         }
@@ -100,6 +102,7 @@ public class MenuItemDAO {
                     rs.getString("dietary_tags")
                 );
                 item.setOutOfStock(outOfStock);
+                item.setAvailableQty((Integer) rs.getObject("available_qty"));
                 return item;
             }
         }
@@ -159,8 +162,8 @@ public class MenuItemDAO {
             menuItem.setItemId(itemId);
         }
 
-        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags, item_id) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags, item_id, available_qty) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -173,6 +176,11 @@ public class MenuItemDAO {
             pstmt.setString(6, menuItem.getImageUrl());
             pstmt.setString(7, menuItem.getDietaryTags());
             pstmt.setString(8, itemId);
+            if (menuItem.getAvailableQty() != null) {
+                pstmt.setInt(9, menuItem.getAvailableQty());
+            } else {
+                pstmt.setNull(9, java.sql.Types.INTEGER);
+            }
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -210,7 +218,7 @@ public class MenuItemDAO {
         MenuItem oldItem = getMenuItemById(menuItem.getItemId());
 
         String sql = "UPDATE menu_items SET name = ?, description = ?, category = ?, " +
-                "price = ?, active = ?, image_url = ?, dietary_tags = ?, out_of_stock = ? WHERE item_id = ?";
+                "price = ?, active = ?, image_url = ?, dietary_tags = ?, out_of_stock = ?, available_qty = ? WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -223,7 +231,12 @@ public class MenuItemDAO {
             pstmt.setString(6, menuItem.getImageUrl());
             pstmt.setString(7, menuItem.getDietaryTags());
             pstmt.setBoolean(8, menuItem.getOutOfStock() != null ? menuItem.getOutOfStock() : false);
-            pstmt.setString(9, menuItem.getItemId());
+            if (menuItem.getAvailableQty() != null) {
+                pstmt.setInt(9, menuItem.getAvailableQty());
+            } else {
+                pstmt.setNull(9, java.sql.Types.INTEGER);
+            }
+            pstmt.setString(10, menuItem.getItemId());
 
             boolean success = pstmt.executeUpdate() > 0;
 
@@ -336,6 +349,47 @@ public class MenuItemDAO {
             }
 
             return success;
+        }
+    }
+
+    /**
+     * Decrements the available quantity for a menu item by the specified amount.
+     * If the quantity reaches 0, the item is automatically marked as out of stock.
+     * @param itemId The menu item ID
+     * @param quantity The amount to decrement
+     * @param conn The database connection (to support transactions)
+     * @return true if the operation was successful
+     */
+    public boolean decrementAvailableQty(String itemId, int quantity, Connection conn) throws SQLException {
+        // First, check if the item has available_qty tracking enabled
+        String checkSql = "SELECT available_qty FROM menu_items WHERE item_id = ?";
+        Integer currentQty = null;
+
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setString(1, itemId);
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next()) {
+                    currentQty = (Integer) rs.getObject("available_qty");
+                }
+            }
+        }
+
+        // If available_qty is null, skip (unlimited inventory)
+        if (currentQty == null) {
+            return true;
+        }
+
+        // Calculate new quantity
+        int newQty = Math.max(0, currentQty - quantity);
+
+        // Update the quantity and set out_of_stock if it reaches 0
+        String updateSql = "UPDATE menu_items SET available_qty = ?, out_of_stock = ? WHERE item_id = ?";
+        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+            updateStmt.setInt(1, newQty);
+            updateStmt.setBoolean(2, newQty == 0);  // Auto set out_of_stock when qty reaches 0
+            updateStmt.setString(3, itemId);
+
+            return updateStmt.executeUpdate() > 0;
         }
     }
 

@@ -244,9 +244,11 @@ export default function TablesAdmin() {
             </button>
           </span>
 
-          <span className="hidden sm:block ml-3">
-            <AuditLogButton entityType="table" label="View Change Log" />
-          </span>
+          {isAdmin && (
+            <span className="hidden sm:block ml-3">
+              <AuditLogButton entityType="table" label="View Change Log" />
+            </span>
+          )}
 
           <span className="sm:ml-3">
             <button
@@ -448,7 +450,7 @@ export default function TablesAdmin() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {isAdmin ? (
+                    {isAdmin && (
                       editing?.tableId === t.tableId ? (
                         <div className="space-x-2">
                           <button
@@ -480,8 +482,6 @@ export default function TablesAdmin() {
                           </button>
                         </div>
                       )
-                    ) : (
-                      <span className="text-sm text-slate-400">View only</span>
                     )}
                   </td>
                 </tr>

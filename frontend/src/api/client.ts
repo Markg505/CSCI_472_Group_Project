@@ -51,6 +51,8 @@ export interface MenuItem {
   active: boolean;
   imageUrl: string;
   dietaryTags: string;
+  outOfStock?: boolean;
+  availableQty?: number | null;
 }
 
 export interface MenuItemWithInventory extends MenuItem {

@@ -24,6 +24,7 @@ type MenuItemType = {
   inventorySku?: string;
   inventoryId?: string;
   outOfStock?: boolean;
+  availableQty?: number | null;
 };
 
 interface EditModalProps {
@@ -42,7 +43,8 @@ function EditModal({ item, onClose, onUpdate, validInventorySkus }: EditModalPro
     description: item.description,
     category: item.category,
     dietaryTags: item.dietaryTags,
-    inventorySku: item.inventoryId ?? item.inventorySku ?? ''
+    inventorySku: item.inventoryId ?? item.inventorySku ?? '',
+    availableQty: item.availableQty?.toString() ?? ''
   });
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
   const [loading, setLoading] = useState(false);
@@ -78,7 +80,8 @@ function EditModal({ item, onClose, onUpdate, validInventorySkus }: EditModalPro
           category: form.category,
           dietaryTags: form.dietaryTags,
           imageUrl: imageUrl,
-          inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined
+          inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined,
+          availableQty: form.availableQty ? parseInt(form.availableQty) : null
         };
 
       console.log('Updating menu item:', updatedItem);
@@ -246,6 +249,23 @@ function EditModal({ item, onClose, onUpdate, validInventorySkus }: EditModalPro
               )}
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Available Quantity (optional)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.availableQty}
+                onChange={(e) => setForm(prev => ({ ...prev, availableQty: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="Leave empty for unlimited"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Number of this item available. Decrements when ordered. Item becomes unavailable at 0.
+              </p>
+            </div>
+
             {error && (
               <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">
                 {error}
@@ -298,7 +318,8 @@ export default function MenuAdmin() {
     dietaryTags: '',
     description: '',
     category: '',
-    inventorySku: ''
+    inventorySku: '',
+    availableQty: ''
   });
 
   useEffect(() => {
@@ -379,7 +400,8 @@ export default function MenuAdmin() {
         dietaryTags: form.dietaryTags,
         description: form.description,
         category: form.category,
-        inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined
+        inventorySku: form.inventorySku ? form.inventorySku.trim() : undefined,
+        availableQty: form.availableQty ? parseInt(form.availableQty) : null
       };
 
       console.log('Creating menu item:', newItem);
@@ -388,16 +410,17 @@ export default function MenuAdmin() {
       
       await loadMenuItems();
       // Reset form with new random ID for next item
-      setForm({ 
-        itemId: generateRandomItemId(), 
-        name: '', 
-        price: '', 
-        active: true, 
-        imageUrl: '', 
-        dietaryTags: '', 
-        description: '', 
+      setForm({
+        itemId: generateRandomItemId(),
+        name: '',
+        price: '',
+        active: true,
+        imageUrl: '',
+        dietaryTags: '',
+        description: '',
         category: '',
-        inventorySku: ''
+        inventorySku: '',
+        availableQty: ''
       });
       setShowAdd(false);
     } catch (error) {
@@ -658,21 +681,38 @@ export default function MenuAdmin() {
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Inventory SKU (optional)</label>
-              <input
-                type="text"
-                value={form.inventorySku}
-                onChange={(e) => setForm(prev => ({ ...prev, inventorySku: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                placeholder="e.g., MEAT-GB80-5LB"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Provide the SKU from Inventory to link stock tracking to this menu item.
-              </p>
-              {form.inventorySku && !inventorySkus.includes(form.inventorySku.trim()) && (
-                <p className="text-xs text-rose-600 mt-1">SKU not found in inventory.</p>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Inventory SKU (optional)</label>
+                <input
+                  type="text"
+                  value={form.inventorySku}
+                  onChange={(e) => setForm(prev => ({ ...prev, inventorySku: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="e.g., MEAT-GB80-5LB"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Provide the SKU from Inventory to link stock tracking to this menu item.
+                </p>
+                {form.inventorySku && !inventorySkus.includes(form.inventorySku.trim()) && (
+                  <p className="text-xs text-rose-600 mt-1">SKU not found in inventory.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Available Quantity (optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.availableQty}
+                  onChange={(e) => setForm(prev => ({ ...prev, availableQty: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Leave empty for unlimited"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Number available. Decrements when ordered. Item becomes unavailable at 0.
+                </p>
+              </div>
             </div>
 
           <div className="mb-4">
@@ -759,6 +799,7 @@ export default function MenuAdmin() {
                 <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Category</th>
                 <th className="px-3 py-2">Price</th>
+                <th className="px-3 py-2">Avail. Qty</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Actions</th>
               </tr>
@@ -798,9 +839,24 @@ export default function MenuAdmin() {
                   </td>
                   <td className="px-3 py-2">${item.price.toFixed(2)}</td>
                   <td className="px-3 py-2">
+                    {item.availableQty !== null && item.availableQty !== undefined ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        item.availableQty === 0
+                          ? 'bg-rose-100 text-rose-800'
+                          : item.availableQty < 10
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {item.availableQty}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">Unlimited</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      item.active 
-                        ? 'bg-green-100 text-green-800' 
+                      item.active
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {item.active ? 'Active' : 'Inactive'}
@@ -827,13 +883,13 @@ export default function MenuAdmin() {
                       <button
                         onClick={() => handleToggleOutOfStock(item.itemId, item.outOfStock || false)}
                         className={`px-3 py-1 rounded text-xs font-medium ${
-                          item.outOfStock
+                          item.outOfStock || (item.availableQty !== null && item.availableQty !== undefined && item.availableQty === 0)
                             ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                         }`}
                         title={item.outOfStock ? 'Mark as in stock' : 'Mark as out of stock'}
                       >
-                        {item.outOfStock ? 'Out of Stock' : 'In Stock'}
+                        {item.outOfStock || (item.availableQty !== null && item.availableQty !== undefined && item.availableQty === 0) ? 'Out of Stock' : 'In Stock'}
                       </button>
                     </div>
                   </td>
@@ -841,7 +897,7 @@ export default function MenuAdmin() {
               ))}
               {menuItems.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                     No menu items found.
                   </td>
                 </tr>

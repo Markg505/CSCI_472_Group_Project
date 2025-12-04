@@ -74,6 +74,14 @@ export default function InventoryAdmin() {
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) return;
+
+    // Check for duplicate name
+    const duplicateName = rows.find(r => r.name.toLowerCase() === form.name.trim().toLowerCase());
+    if (duplicateName) {
+      alert(`An inventory item with the name "${form.name}" already exists. Please use a different name.`);
+      return;
+    }
+
     try {
       await apiClient.createInventory({
         ...form,
@@ -109,6 +117,17 @@ export default function InventoryAdmin() {
 
   async function onSaveEdit() {
     if (!editing) return;
+
+    // Check for duplicate name (excluding the current item being edited)
+    const duplicateName = rows.find(r =>
+      r.id !== editing.id &&
+      r.name.toLowerCase() === editing.name.trim().toLowerCase()
+    );
+    if (duplicateName) {
+      alert(`An inventory item with the name "${editing.name}" already exists. Please use a different name.`);
+      return;
+    }
+
     try {
       const { id, ...payload } = editing as UIInventory;
       await apiClient.updateInventory({ ...payload, inventoryId: id });

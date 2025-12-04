@@ -70,20 +70,37 @@ export default function MenuPage() {
   const [itemWithNotes, setItemWithNotes] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
 
+  const loadMenuItems = async () => {
+    try {
+      const items = await apiClient.getMenuWithInventory();
+      setMenuItems(items);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+      const basicItems = await apiClient.getActiveMenuItems();
+      setMenuItems(basicItems as MenuItemWithInventory[]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadMenuItems = async () => {
-      try {
-        const items = await apiClient.getMenuWithInventory();
-        setMenuItems(items);
-      } catch (error) {
-        console.error('Error loading menu items:', error);
-        const basicItems = await apiClient.getActiveMenuItems();
-        setMenuItems(basicItems as MenuItemWithInventory[]);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadMenuItems();
+
+    // Refresh menu every 30 seconds to pick up out-of-stock changes
+    const interval = setInterval(() => {
+      loadMenuItems();
+    }, 30000);
+
+    // Refetch when page regains focus
+    const handleFocus = () => {
+      loadMenuItems();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const addToCart = (menuItem: MenuItemWithInventory, customNotes?: string, modifiers?: ModifierChoice[]) => {
@@ -171,7 +188,7 @@ export default function MenuPage() {
   const enhancedMenu = useMemo(() => {
     return menuItems.map(item => {
       const dietaryTags = parseDietaryTags(item.dietaryTags);
-      const isAvailable = item.active && (!item.inventory || item.inventory.available) && !(item as any).outOfStock;
+      const isAvailable = item.active && (!item.inventory || item.inventory.available) && !item.outOfStock;
       const hasLowStock = item.inventory ? item.inventory.qtyOnHand <= item.inventory.reorderPoint : false;
 
       return {
@@ -312,16 +329,9 @@ export default function MenuPage() {
                 <article
                   key={d.id}
                   className={`group overflow-hidden rounded-3xl border border-white/10 bg-card transition shadow ${
-                    !d.available ? 'opacity-60 cursor-not-allowed' : 'hover:border-white/20'
+                    !d.available ? 'opacity-50 cursor-not-allowed' : 'hover:border-white/20'
                   }`}
                 >
-                  {!d.available && (
-                    <div className="absolute inset-0 z-10 bg-black/40 rounded-3xl flex items-center justify-center">
-                      <div className="bg-rose-500/90 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg">
-                        Out of Stock
-                      </div>
-                    </div>
-                  )}
                   <div className="h-44 w-full overflow-hidden bg-white/5 flex items-center justify-center">
                     <img
                       src={d.image}

@@ -16,10 +16,12 @@ import java.util.Map;
 public class OrderDAO {
     private ServletContext context;
     private OrderItemDAO orderItemDAO;
+    private MenuItemDAO menuItemDAO;
 
     public OrderDAO(ServletContext context) {
         this.context = context;
         this.orderItemDAO = new OrderItemDAO(context);
+        this.menuItemDAO = new MenuItemDAO(context);
     }
 
     public List<Order> getAllOrders() throws SQLException {
@@ -293,6 +295,9 @@ public class OrderDAO {
                     for (OrderItem item : order.getOrderItems()) {
                         item.setOrderId(orderId);
                         orderItemDAO.createOrderItem(item, conn);
+
+                        // Decrement available quantity for menu items
+                        menuItemDAO.decrementAvailableQty(item.getItemId(), item.getQty(), conn);
                     }
                 }
 

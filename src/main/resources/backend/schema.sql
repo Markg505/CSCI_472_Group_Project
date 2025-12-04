@@ -70,7 +70,8 @@ CREATE TABLE menu_items (
   active         INTEGER NOT NULL DEFAULT 1,
   image_url      TEXT,
   dietary_tags   TEXT,
-  out_of_stock   INTEGER NOT NULL DEFAULT 0
+  out_of_stock   INTEGER NOT NULL DEFAULT 0,
+  available_qty  INTEGER DEFAULT NULL
 );
 
 -- inventory

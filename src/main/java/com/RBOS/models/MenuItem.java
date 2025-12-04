@@ -13,6 +13,7 @@ public class MenuItem {
     private String imageUrl;
     private String dietaryTags;
     private Boolean outOfStock;
+    private Integer availableQty;
 
     public MenuItem() {}
 
@@ -56,4 +57,7 @@ public class MenuItem {
 
     public Boolean getOutOfStock() { return outOfStock; }
     public void setOutOfStock(Boolean outOfStock) { this.outOfStock = outOfStock; }
+
+    public Integer getAvailableQty() { return availableQty; }
+    public void setAvailableQty(Integer availableQty) { this.availableQty = availableQty; }
 }
