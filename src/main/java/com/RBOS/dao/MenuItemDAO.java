@@ -3,6 +3,7 @@ package com.RBOS.dao;
 import com.RBOS.models.MenuItem;
 import com.RBOS.models.MenuItemWithInventory;
 import com.RBOS.utils.DatabaseConnection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletContext;
 import java.sql.*;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.Map;
 public class MenuItemDAO {
     private ServletContext context;
     private AuditLogDAO auditLogDAO;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MenuItemDAO(ServletContext context) {
         this.context = context;
@@ -182,7 +184,15 @@ public class MenuItemDAO {
                     newValues.put("price", menuItem.getPrice());
                     newValues.put("category", menuItem.getCategory());
                     newValues.put("active", menuItem.getActive());
-                    auditLogDAO.logAction(userId, userName, "menu_item", itemId, "create", null, newValues);
+                    auditLogDAO.log(
+                            "menu_item",
+                            itemId,
+                            "create",
+                            userId,
+                            userName,
+                            null,
+                            objectToJson(newValues)
+                    );
                 }
                 return itemId;
             }
@@ -233,7 +243,15 @@ public class MenuItemDAO {
                 newValues.put("active", menuItem.getActive());
                 newValues.put("outOfStock", menuItem.getOutOfStock());
 
-                auditLogDAO.logAction(userId, userName, "menu_item", menuItem.getItemId(), "update", oldValues, newValues);
+                auditLogDAO.log(
+                        "menu_item",
+                        menuItem.getItemId(),
+                        "update",
+                        userId,
+                        userName,
+                        objectToJson(oldValues),
+                        objectToJson(newValues)
+                );
             }
 
             return success;
@@ -267,7 +285,15 @@ public class MenuItemDAO {
                 Map<String, Object> newValues = new HashMap<>();
                 newValues.put("active", active);
 
-                auditLogDAO.logAction(userId, userName, "menu_item", itemId, "toggle_active", oldValues, newValues);
+                auditLogDAO.log(
+                        "menu_item",
+                        itemId,
+                        "toggle_active",
+                        userId,
+                        userName,
+                        objectToJson(oldValues),
+                        objectToJson(newValues)
+                );
             }
 
             return success;
@@ -298,10 +324,26 @@ public class MenuItemDAO {
                 oldValues.put("price", oldItem.getPrice());
                 oldValues.put("category", oldItem.getCategory());
 
-                auditLogDAO.logAction(userId, userName, "menu_item", itemId, "delete", oldValues, null);
+                auditLogDAO.log(
+                        "menu_item",
+                        itemId,
+                        "delete",
+                        userId,
+                        userName,
+                        objectToJson(oldValues),
+                        null
+                );
             }
 
             return success;
+        }
+    }
+
+    private String objectToJson(Map<String, Object> value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            return "{}";
         }
     }
 }

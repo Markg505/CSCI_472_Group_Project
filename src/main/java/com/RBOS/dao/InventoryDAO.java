@@ -212,6 +212,10 @@ public class InventoryDAO {
             inventoryId = java.util.UUID.randomUUID().toString();
             inventory.setInventoryId(inventoryId);
         }
+        // If no menu item is linked, store NULL to avoid FK failures
+        if (inventory.getItemId() == null || inventory.getItemId().isBlank()) {
+            inventory.setItemId(null);
+        }
 
         String sql = "INSERT INTO inventory (inventory_id, item_id, name, sku, category, unit, pack_size, " +
                 "qty_on_hand, par_level, reorder_point, cost, location, active, vendor, " +
@@ -233,7 +237,11 @@ public class InventoryDAO {
     }
 
     private void setInventoryPreparedStatement(PreparedStatement pstmt, Inventory inventory, int startIndex) throws SQLException {
-        pstmt.setString(startIndex, inventory.getItemId());
+        if (inventory.getItemId() == null || inventory.getItemId().isBlank()) {
+            pstmt.setNull(startIndex, java.sql.Types.VARCHAR);
+        } else {
+            pstmt.setString(startIndex, inventory.getItemId());
+        }
         pstmt.setString(startIndex + 1, inventory.getName());
         pstmt.setString(startIndex + 2, inventory.getSku());
         pstmt.setString(startIndex + 3, inventory.getCategory());

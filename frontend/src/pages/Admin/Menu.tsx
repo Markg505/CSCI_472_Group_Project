@@ -8,7 +8,7 @@ import {
   TagIcon,
 } from '@heroicons/react/20/solid';
 import type { MenuItem } from '../../lib/adminApi';
-import AuditLogButton from '../../components/AuditLogButton';
+
 
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=1200&auto=format&fit=crop";
 

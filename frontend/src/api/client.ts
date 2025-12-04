@@ -281,6 +281,7 @@ class ApiClient {
         ...(cartToken ? { 'X-Cart-Token': cartToken } : {}),
         ...options.headers,
       },
+      credentials: 'include',
       ...options,
     });
 

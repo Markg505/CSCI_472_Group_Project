@@ -29,8 +29,8 @@ public class AuditLogDAO {
                 action TEXT NOT NULL,
                 user_id TEXT,
                 user_name TEXT,
-                old_value TEXT,
-                new_value TEXT,
+                old_values TEXT,
+                new_values TEXT,
                 created_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """;
@@ -49,7 +49,7 @@ public class AuditLogDAO {
         ensureTableExists();
 
         String sql = """
-            INSERT INTO audit_log (log_id, entity_type, entity_id, action, user_id, user_name, old_value, new_value)
+            INSERT INTO audit_log (log_id, entity_type, entity_id, action, user_id, user_name, old_values, new_values)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """;
 
@@ -74,7 +74,7 @@ public class AuditLogDAO {
         ensureTableExists();
 
         String sql = """
-            SELECT log_id, entity_type, entity_id, action, user_id, user_name, old_value, new_value, created_utc
+            SELECT log_id, entity_type, entity_id, action, user_id, user_name, old_values, new_values, created_utc
             FROM audit_log
             WHERE entity_type = ?
             ORDER BY created_utc DESC
@@ -93,8 +93,8 @@ public class AuditLogDAO {
                         rs.getString("action"),
                         rs.getString("user_id"),
                         rs.getString("user_name"),
-                        rs.getString("old_value"),
-                        rs.getString("new_value"),
+                        rs.getString("old_values"),
+                        rs.getString("new_values"),
                         rs.getString("created_utc")
                     );
                     logs.add(log);
@@ -111,7 +111,7 @@ public class AuditLogDAO {
         ensureTableExists();
 
         String sql = """
-            SELECT log_id, entity_type, entity_id, action, user_id, user_name, old_value, new_value, created_utc
+            SELECT log_id, entity_type, entity_id, action, user_id, user_name, old_values, new_values, created_utc
             FROM audit_log
             ORDER BY created_utc DESC
         """;

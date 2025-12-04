@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  listInventory, addInventoryItem, updateInventoryItem, removeInventoryItem,
-  type InventoryItem, type Unit, type CountFreq, type Allergen
-} from "../../lib/adminApi";
+import { apiClient, type Inventory, type Unit, type CountFreq, type Allergen } from "../../api/client";
 import {
   CheckIcon, LinkIcon, PencilIcon, TrashIcon, TagIcon, ChevronDownIcon, PlusIcon
 } from "@heroicons/react/20/solid";
@@ -15,7 +12,8 @@ const UNITS: Unit[] = ["each","lb","oz","case","bag"];
 const COUNTS: CountFreq[] = ["daily","weekly","monthly"];
 const ALLERGENS: Allergen[] = ["none","gluten","dairy","eggs","soy","peanuts","tree-nuts","shellfish","fish","sesame"];
 
-type FormState = Omit<InventoryItem, "id">;
+type UIInventory = Inventory & { id: string };
+type FormState = Omit<Inventory, "inventoryId" | "itemId" | "createdUtc" | "menuItem">;
 
 const emptyForm: FormState = {
   name: "", sku: "", category: "",
@@ -30,19 +28,34 @@ const emptyForm: FormState = {
 };
 
 export default function InventoryAdmin() {
-  const [rows, setRows] = useState<InventoryItem[]>([]);
+  const [rows, setRows] = useState<UIInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [editing, setEditing] = useState<UIInventory | null>(null);
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
-      setRows(await listInventory());
-      setLoading(false);
+      try {
+        setLoading(true);
+        const data = await apiClient.getInventory();
+        setRows(data.map(normalizeInventory));
+      } catch (err) {
+        console.error("Failed to load inventory", err);
+        alert("Error loading inventory from server.");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
+
+  function normalizeInventory(inv: Inventory): UIInventory {
+    const fallbackId = `inv-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+    return {
+      ...inv,
+      id: inv.inventoryId || inv.itemId || inv.sku || fallbackId
+    };
+  }
 
   const totalSkus = rows.length;
   const belowPar = useMemo(() => rows.filter(r => r.qtyOnHand < r.parLevel).length, [rows]);
@@ -52,7 +65,7 @@ export default function InventoryAdmin() {
     [rows]
   );
 
-  function statusFor(r: InventoryItem) {
+  function statusFor(r: UIInventory) {
     if (r.qtyOnHand <= r.reorderPoint) return { txt: "reorder", cls: "bg-rose-50 text-rose-700 ring-rose-200" };
     if (r.qtyOnHand < r.parLevel) return { txt: "below par", cls: "bg-amber-50 text-amber-700 ring-amber-200" };
     return { txt: "ok", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" };
@@ -61,33 +74,51 @@ export default function InventoryAdmin() {
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) return;
-    await addInventoryItem({
-      ...form,
-      packSize: Number(form.packSize) || 1,
-      qtyOnHand: Number(form.qtyOnHand) || 0,
-      parLevel: Number(form.parLevel) || 0,
-      reorderPoint: Number(form.reorderPoint) || 0,
-      cost: Number(form.cost) || 0,
-      leadTimeDays: Number(form.leadTimeDays) || 0,
-      preferredOrderQty: Number(form.preferredOrderQty) || 0,
-      wasteQty: Number(form.wasteQty) || 0,
-    });
-    setRows(await listInventory());
-    setForm(emptyForm);
-    setShowAdd(false);
+    try {
+      await apiClient.createInventory({
+        ...form,
+        packSize: Number(form.packSize) || 1,
+        qtyOnHand: Number(form.qtyOnHand) || 0,
+        parLevel: Number(form.parLevel) || 0,
+        reorderPoint: Number(form.reorderPoint) || 0,
+        cost: Number(form.cost) || 0,
+        leadTimeDays: Number(form.leadTimeDays) || 0,
+        preferredOrderQty: Number(form.preferredOrderQty) || 0,
+        wasteQty: Number(form.wasteQty) || 0,
+      });
+      const data = await apiClient.getInventory();
+      setRows(data.map(normalizeInventory));
+      setForm(emptyForm);
+      setShowAdd(false);
+    } catch (err) {
+      console.error("Create inventory failed", err);
+      alert("Error creating inventory item.");
+    }
   }
 
   async function onDelete(id: string) {
-    await removeInventoryItem(id);
-    setRows(await listInventory());
+    try {
+      await apiClient.deleteInventory(id);
+      const data = await apiClient.getInventory();
+      setRows(data.map(normalizeInventory));
+    } catch (err) {
+      console.error("Delete inventory failed", err);
+      alert("Error deleting inventory item.");
+    }
   }
 
   async function onSaveEdit() {
     if (!editing) return;
-    const { id, ...patch } = editing;
-    await updateInventoryItem(id, patch);
-    setRows(await listInventory());
-    setEditing(null);
+    try {
+      const { id, ...payload } = editing as UIInventory;
+      await apiClient.updateInventory({ ...payload, inventoryId: id });
+      const data = await apiClient.getInventory();
+      setRows(data.map(normalizeInventory));
+      setEditing(null);
+    } catch (err) {
+      console.error("Update inventory failed", err);
+      alert("Error updating inventory item.");
+    }
   }
 
   function exportCSV() {
