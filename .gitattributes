@@ -1,0 +1,4 @@
+# Normalize line endings for source files
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
