@@ -25,7 +25,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ adminPath = "/admin" }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const isSignedIn = Boolean(user && (user.userId ?? user.id ?? user.email));
+  const isSignedIn = Boolean(user && (user.userId ?? user.email));
   const role = String(user?.role ?? "").toLowerCase();
   const isAdminOrStaff = isSignedIn && (role === "admin" || role === "staff");
 

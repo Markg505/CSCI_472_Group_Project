@@ -40,7 +40,7 @@ export default function Users() {
 
   const [form, setForm] = useState({ name: "", email: "", phone: "", role: "customer", password: "" });
 
-  const { user: me } = useAuth();
+  const { user: me, refreshProfile, setUser } = useAuth();
   const myRole = String(me?.role ?? "").toLowerCase();
   const isAdmin = myRole === "admin";
   const isStaff = myRole === "staff";
@@ -127,14 +127,28 @@ export default function Users() {
     if (!id) return alert("Missing user id");
 
     try {
+      // Preserve other fields so we don't clear addresses when only changing name/email/phone
+      const existing = rows.find(r => safeId(r) === id) || {};
       await apiClient.updateUser({
         userId: id,
         fullName: editForm.name.trim(),
         email: editForm.email.trim(),
         phone: editForm.phone.trim() || undefined,
         role: editForm.role as User["role"],
+        address: (existing as any).address ?? null,
+        address2: (existing as any).address2 ?? null,
+        city: (existing as any).city ?? null,
+        state: (existing as any).state ?? null,
+        postalCode: (existing as any).postalCode ?? null,
       } as User);
       await load();
+      // If we edited ourselves, refresh auth cache so greetings/dashboard show latest name
+      if (me && (me.userId === id || (me as any).id === id)) {
+        try {
+          const fresh = await refreshProfile();
+          if (fresh) setUser(fresh);
+        } catch {/* ignore */}
+      }
       cancelEdit();
     } catch (err: any) {
       console.error("update failed", err);

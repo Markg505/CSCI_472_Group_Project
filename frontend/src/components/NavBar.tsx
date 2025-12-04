@@ -52,7 +52,7 @@ export default function NavBar() {
     }
   };
 
-  const isSignedIn = Boolean(user && (user.userId ?? user.id ?? user.email)); 
+  const isSignedIn = Boolean(user && (user.userId ?? user.email)); 
   const normalizedRole = String(user?.role ?? "").toLowerCase();
   const isAdminOrStaff = isSignedIn && (normalizedRole === "admin" || normalizedRole === "staff");
 

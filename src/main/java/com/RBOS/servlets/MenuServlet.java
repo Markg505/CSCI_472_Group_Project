@@ -2,15 +2,12 @@ package com.RBOS.servlets;
 
 import com.RBOS.dao.MenuItemDAO;
 import com.RBOS.dao.InventoryDAO;
-import com.RBOS.dao.AuditLogDAO;
-import com.RBOS.dao.UserDAO;
 import com.RBOS.models.MenuItem;
 import com.RBOS.models.MenuItemWithInventory;
-import com.RBOS.models.User;
 import com.RBOS.utils.DatabaseConnection;
+import com.RBOS.dao.AuditLogDAO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
@@ -19,20 +16,20 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @WebServlet("/api/menu/*")
 public class MenuServlet extends HttpServlet {
     private MenuItemDAO menuItemDAO;
-    private AuditLogDAO auditDAO;
-    private UserDAO userDAO;
     private ObjectMapper objectMapper;
-
+    private AuditLogDAO auditLogDAO;
+    
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         menuItemDAO = new MenuItemDAO(getServletContext());
-        auditDAO = new AuditLogDAO(getServletContext());
-        userDAO = new UserDAO(getServletContext());
+        auditLogDAO = new AuditLogDAO(getServletContext());
     }
     
     @Override
@@ -91,30 +88,26 @@ public class MenuServlet extends HttpServlet {
     }
     
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
+
             JsonNode root = objectMapper.readTree(request.getReader());
             MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
-            String itemId = menuItemDAO.createMenuItem(menuItem);
-            
+            String itemId = menuItemDAO.createMenuItem(menuItem, userId, userName);
+
             if (itemId != null) {
                 menuItem.setItemId(itemId);
 
                 linkInventory(root, itemId);
-
-                // Log audit
-                try {
-                    String actorId = getSessionUserId(request);
-                    auditDAO.log("menu_item", itemId, "create", actorId, getSessionUserName(request),
-                            null, "Menu item created: " + menuItem.getName());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
 
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(menuItem));
@@ -150,6 +143,7 @@ public class MenuServlet extends HttpServlet {
                 String itemId = splits[1];
                 JsonNode json = objectMapper.readTree(request.getReader());
                 String imageUrl = json.get("imageUrl").asText();
+                MenuItem before = menuItemDAO.getMenuItemById(itemId);
 
                 // Basic URL validation
                 if (imageUrl != null && !imageUrl.isEmpty() &&
@@ -161,6 +155,22 @@ public class MenuServlet extends HttpServlet {
                 boolean success = updateMenuItemImage(itemId, imageUrl);
                 if (success) {
                     MenuItem updatedItem = menuItemDAO.getMenuItemById(itemId);
+                    try {
+                        HttpSession session = request.getSession(false);
+                        String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
+                        String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
+                        if (actingUserId != null && actingUserName != null) {
+                            Map<String, Object> oldValues = new HashMap<>();
+                            if (before != null) {
+                                oldValues.put("imageUrl", before.getImageUrl());
+                            }
+                            Map<String, Object> newValues = new HashMap<>();
+                            newValues.put("imageUrl", imageUrl);
+                            auditLogDAO.logAction(actingUserId, actingUserName, "menu_item", itemId, "update_image", oldValues, newValues);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Audit log skipped for menu image: " + e.getMessage());
+                    }
                     response.getWriter().write(objectMapper.writeValueAsString(updatedItem));
                 } else {
                     response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -176,28 +186,19 @@ public class MenuServlet extends HttpServlet {
 
             String itemId = splits[1];
 
-            // Get old menu item data for audit
-            MenuItem oldItem = menuItemDAO.getMenuItemById(itemId);
-            String oldValue = oldItem != null ? objectMapper.writeValueAsString(oldItem) : null;
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
 
             JsonNode root = objectMapper.readTree(request.getReader());
             MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
             menuItem.setItemId(itemId); // Ensure the ID matches the path
 
-            boolean success = menuItemDAO.updateMenuItem(menuItem);
+            boolean success = menuItemDAO.updateMenuItem(menuItem, userId, userName);
 
             if (success) {
                 linkInventory(root, itemId);
-
-                // Log audit
-                try {
-                    String actorId = getSessionUserId(request);
-                    auditDAO.log("menu_item", itemId, "update", actorId, getSessionUserName(request),
-                            oldValue, objectMapper.writeValueAsString(menuItem));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
                 response.getWriter().write(objectMapper.writeValueAsString(menuItem));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -211,9 +212,9 @@ public class MenuServlet extends HttpServlet {
     }
     
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -221,24 +222,15 @@ public class MenuServlet extends HttpServlet {
                 return;
             }
 
+            // Get user info from session for audit logging
+            HttpSession session = request.getSession(false);
+            String userId = session != null ? (String) session.getAttribute("userId") : null;
+            String userName = session != null ? (String) session.getAttribute("userName") : null;
+
             String itemId = pathInfo.split("/")[1];
-
-            // Get menu item data before deletion for audit
-            MenuItem deletedItem = menuItemDAO.getMenuItemById(itemId);
-            String oldValue = deletedItem != null ? objectMapper.writeValueAsString(deletedItem) : null;
-
-            boolean success = menuItemDAO.deleteMenuItem(itemId);
+            boolean success = menuItemDAO.deleteMenuItem(itemId, userId, userName);
 
             if (success) {
-                // Log audit
-                try {
-                    String actorId = getSessionUserId(request);
-                    auditDAO.log("menu_item", itemId, "delete", actorId, getSessionUserName(request),
-                            oldValue, null);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -277,26 +269,6 @@ public class MenuServlet extends HttpServlet {
         } catch (Exception e) {
             // swallow linking errors to avoid failing menu updates
             System.err.println("Inventory link skipped: " + e.getMessage());
-        }
-    }
-
-    private String getSessionUserId(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session == null) return "system";
-        Object userId = session.getAttribute("userId");
-        return userId != null ? userId.toString() : "system";
-    }
-
-    private String getSessionUserName(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session == null) return "System";
-        try {
-            String userId = getSessionUserId(request);
-            if ("system".equals(userId)) return "System";
-            User user = userDAO.getUserById(userId);
-            return user != null ? user.getFullName() : "System";
-        } catch (Exception e) {
-            return "System";
         }
     }
 }

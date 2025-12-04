@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface WebSocketMessage {
   type: string;
-  message: string;
+  message?: string;
   timestamp: number;
+  tableId?: string;
+  x?: number;
+  y?: number;
 }
 
 export const useWebSocket = () => {

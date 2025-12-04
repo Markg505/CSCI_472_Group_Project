@@ -96,6 +96,14 @@ export default function Bookings() {
   const [showSettings, setShowSettings] = useState(false); // toggles settings panel
   const [statusFilter, setStatusFilter] = useState<'all' | Reservation['status']>('all');
 
+  const tableNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    tables.forEach(t => {
+      map[String(t.tableId)] = t.name || `Table ${t.tableId}`;
+    });
+    return map;
+  }, [tables]);
+
   // load reservations + settings on mount
   useEffect(() => { loadReservations(); loadSettings(); loadTables(); }, []);
 
@@ -321,7 +329,7 @@ export default function Bookings() {
     statusFilter === 'all' ? list : list.filter(r => r.status === statusFilter);
 
   function exportCSV() {
-    const header = ['ID','Customer ID','Table ID','Start Time','End Time','Party Size','Status','Notes'];
+    const header = ['ID','Customer ID','Table','Start Time','End Time','Party Size','Status','Notes'];
     const list = (tab === 'history' ? historyReservations : currentReservations);
     const lines = list.map(r => [
       r.reservationId ?? '',
@@ -655,7 +663,7 @@ export default function Bookings() {
                     {r.userId ? `User ${r.userId}` : 'Guest'}
                     {r.guestName ? ` · ${r.guestName}` : ''}
                   </td>
-                  <td className="px-3 py-2">Table {r.tableId}</td>
+                  <td className="px-3 py-2">{tableNameById[String(r.tableId ?? '')] ?? `Table ${r.tableId}`}</td>
                   <td className="px-3 py-2">
                     {formatDate(r.startUtc)}<br/>to {formatDate(r.endUtc)}
                   </td>

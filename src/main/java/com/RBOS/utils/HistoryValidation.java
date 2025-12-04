@@ -89,9 +89,13 @@ public class HistoryValidation {
         return now.atZone(ZoneOffset.UTC).minusMonths(months).toInstant();
     }
 
-    public static Instant clampStart(Instant requested, Instant retentionHorizon) {
-        Instant base = requested != null ? requested : retentionHorizon;
-        return base.isBefore(retentionHorizon) ? retentionHorizon : base;
+    public static Instant clampStart(Instant requested, Instant retentionHorizon, Instant now) {
+        if (requested == null) return null;
+        Instant base = requested;
+        if (base.isBefore(retentionHorizon)) {
+            return retentionHorizon;
+        }
+        return base;
     }
 
     public static Instant clampEnd(Instant requested, Instant retentionHorizon, Instant now) {
@@ -99,9 +103,7 @@ public class HistoryValidation {
         if (base.isBefore(retentionHorizon)) {
             return retentionHorizon;
         }
-        if (base.isAfter(now)) {
-            return now;
-        }
+        // allow future end dates (e.g., upcoming reservations); do not clamp to now
         return base;
     }
 

@@ -87,6 +87,33 @@ public class WebSocketConfig {
         broadcastToAdmins("ORDER_UPDATED", orderData);
     }
     
+    public static void notifyTableMoved(String tableId, int x, int y) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("type", "TABLE_MOVED");
+            payload.put("tableId", tableId);
+            payload.put("x", x);
+            payload.put("y", y);
+            payload.put("timestamp", System.currentTimeMillis());
+            String jsonMessage = mapper.writeValueAsString(payload);
+
+            System.out.println("Broadcasting to " + sessions.size() + " clients: " + jsonMessage);
+
+            sessions.forEach(session -> {
+                if (session.isOpen()) {
+                    try {
+                        session.getBasicRemote().sendText(jsonMessage);
+                    } catch (Exception e) {
+                        System.err.println("Failed to send message to session " + session.getId() + ": " + e.getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Failed to broadcast WebSocket message: " + e.getMessage());
+        }
+    }
+    
     // WebSocket Configurator
     public static class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
         @Override

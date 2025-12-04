@@ -367,16 +367,16 @@ public class OrderServlet extends HttpServlet {
 
         Instant now = Instant.now();
         Instant retentionHorizon = HistoryValidation.retentionHorizon(now, RETENTION_MONTHS);
-        Instant clampedStart = HistoryValidation.clampStart(startInstant, retentionHorizon);
-        Instant clampedEnd = HistoryValidation.clampEnd(endInstant, retentionHorizon, now);
+        Instant clampedStart = startInstant != null ? HistoryValidation.clampStart(startInstant, retentionHorizon, now) : null;
+        Instant clampedEnd = endInstant != null ? HistoryValidation.clampEnd(endInstant, retentionHorizon, now) : null;
 
-        if (clampedStart.isAfter(clampedEnd)) {
+        if (clampedStart != null && clampedEnd != null && clampedStart.isAfter(clampedEnd)) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Requested range is outside the retention window");
             return;
         }
 
-        String startUtc = HistoryValidation.formatInstant(clampedStart);
-        String endUtc = HistoryValidation.formatInstant(clampedEnd);
+        String startUtc = clampedStart != null ? HistoryValidation.formatInstant(clampedStart) : null;
+        String endUtc = clampedEnd != null ? HistoryValidation.formatInstant(clampedEnd) : null;
 
         String sessionUserId = getSessionUserId(request);
         String sessionRole = getSessionRole(request);
@@ -977,3 +977,4 @@ public class OrderServlet extends HttpServlet {
         public String cartToken;
     }
 }
+

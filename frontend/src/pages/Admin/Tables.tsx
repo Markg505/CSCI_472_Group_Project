@@ -13,17 +13,26 @@ import {
   MenuItem as HUMenuItem,
   MenuItems as HUMenuItems,
 } from "@headlessui/react";
+import EditableTableMap from './EditableTableMap';
 import AuditLogButton from "../../components/AuditLogButton";
+
 
 export default function TablesAdmin() {
   const [rows, setRows] = useState<DiningTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
 
-  const [form, setForm] = useState<{ name: string; capacity: string; notes: string }>({
+  const [form, setForm] = useState<{ name: string; capacity: string; notes: string; basePrice: string }>({
     name: "",
     capacity: "",
     notes: "",
+    basePrice: "0",
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; capacity: string; basePrice: string }>({
+    name: "",
+    capacity: "",
+    basePrice: "0",
   });
 
   useEffect(() => {
@@ -53,9 +62,10 @@ export default function TablesAdmin() {
     if (Number.isNaN(cap) || cap <= 0) return;
 
     const name = form.name.trim() || `Table ${rows.length + 1}`;
-    await apiClient.createTable({ name, capacity: cap });
+    const basePrice = parseFloat(form.basePrice || "0") || 0;
+    await apiClient.createTable({ name, capacity: cap, basePrice });
     await refresh();
-    setForm({ name: "", capacity: "", notes: "" });
+    setForm({ name: "", capacity: "", notes: "", basePrice: "0" });
     setShowAdd(false);
   }
 
@@ -69,9 +79,42 @@ export default function TablesAdmin() {
     await refresh();
   }
 
+  function startEdit(table: DiningTable) {
+    setEditingId(table.tableId);
+    setEditForm({
+      name: table.name || "",
+      capacity: String(table.capacity ?? ""),
+      basePrice: String(table.basePrice ?? "0"),
+    });
+  }
+
+  async function saveEdit(tableId: string) {
+    const cap = parseInt(editForm.capacity, 10);
+    if (Number.isNaN(cap) || cap <= 0) return;
+    const basePrice = parseFloat(editForm.basePrice || "0") || 0;
+    try {
+      const current = rows.find(r => r.tableId === tableId);
+      await apiClient.updateTable({
+        tableId,
+        name: editForm.name.trim() || `Table ${tableId}`,
+        capacity: cap,
+        // Send both snake and camel to keep backend happy
+        pos_x: current?.pos_x ?? 0,
+        pos_y: current?.pos_y ?? 0,
+        posX: (current as any)?.posX ?? current?.pos_x ?? 0,
+        posY: (current as any)?.posY ?? current?.pos_y ?? 0,
+        basePrice,
+      } as any);
+      setEditingId(null);
+      await refresh();
+    } catch (err) {
+      console.error("Update failed", err);
+    }
+  }
+
   function exportCSV() {
-    const header = ["Name", "Capacity"];
-    const lines = rows.map(r => [r.name || r.tableId, r.capacity].join(","));
+    const header = ["Name", "Capacity", "Base Price"];
+    const lines = rows.map(r => [r.name || r.tableId, r.capacity, r.basePrice ?? 0].join(","));
     const csv = [header.join(","), ...lines].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -98,11 +141,15 @@ export default function TablesAdmin() {
               <UserGroupIcon className="mr-1.5 size-5 shrink-0 text-gray-400" />
               Seats: {totalSeats}
             </div>
+            <div className="mt-2 flex items-center text-sm text-gray-500">
+              <span className="mr-1.5 inline-block size-2 rounded-full bg-amber-500" />
+              Base Fees: ${rows.reduce((sum, r) => sum + (r.basePrice ?? 0), 0).toFixed(2)}
+            </div>
           </div>
         </div>
 
         <div className="mt-5 flex lg:mt-0 lg:ml-4">
-          <span className="hidden sm:block">
+          <span>
             <button
               type="button"
               onClick={() => setShowAdd(s => !s)}
@@ -113,7 +160,7 @@ export default function TablesAdmin() {
             </button>
           </span>
 
-          <span className="hidden sm:block ml-3">
+          <span className="ml-3">
             <button
               type="button"
               onClick={exportCSV}
@@ -124,7 +171,7 @@ export default function TablesAdmin() {
             </button>
           </span>
 
-          <span className="hidden sm:block ml-3">
+          <span className="ml-3">
             <AuditLogButton entityType="table" label="View Change Log" />
           </span>
 
@@ -178,6 +225,8 @@ export default function TablesAdmin() {
         </div>
       </div>
 
+      <EditableTableMap refreshKey={rows.length} />
+      
       {/* Add table (toggle) */}
       {showAdd && (
         <form
@@ -206,6 +255,18 @@ export default function TablesAdmin() {
                 min={1}
               />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Base Price</label>
+              <input
+                type="number"
+                className="w-32 rounded-md border border-slate-300 px-3 py-2"
+                value={form.basePrice}
+                onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
+                placeholder="0"
+                min={0}
+                step="0.01"
+              />
+            </div>
             <div className="min-w-[220px] flex-1">
               <label className="mb-1 block text-xs font-medium text-slate-600">Notes (optional)</label>
               <input
@@ -218,7 +279,7 @@ export default function TablesAdmin() {
             <div className="ml-auto flex gap-2">
               <button
                 type="button"
-                onClick={() => { setShowAdd(false); setForm({ name: "", capacity: "", notes: "" }); }}
+                onClick={() => { setShowAdd(false); setForm({ name: "", capacity: "", notes: "", basePrice: "0" }); }}
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
               >
                 Cancel
@@ -244,27 +305,86 @@ export default function TablesAdmin() {
               <tr className="text-left text-sm text-slate-600">
                 <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Capacity</th>
+                <th className="px-3 py-2">Base Price</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.map(t => (
-                <tr key={t.tableId} className="text-sm">
-                  <td className="px-3 py-2">{t.name || t.tableId}</td>
-                  <td className="px-3 py-2">{t.capacity}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
-                      onClick={() => onDelete(t.tableId)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map(t => {
+                const isEditing = editingId === t.tableId;
+                return (
+                  <tr key={t.tableId} className="text-sm">
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input
+                          className="input w-40"
+                          value={editForm.name}
+                          onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                        />
+                      ) : (t.name || t.tableId)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="input w-24"
+                          value={editForm.capacity}
+                          onChange={e => setEditForm(f => ({ ...f, capacity: e.target.value }))}
+                          min={1}
+                        />
+                      ) : t.capacity}
+                    </td>
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          className="input w-24"
+                          value={editForm.basePrice}
+                          onChange={e => setEditForm(f => ({ ...f, basePrice: e.target.value }))}
+                          min={0}
+                          step="0.01"
+                        />
+                      ) : `$${(t.basePrice ?? 0).toFixed(2)}`}
+                    </td>
+                    <td className="px-3 py-2 text-right space-x-2">
+                      {isEditing ? (
+                        <>
+                          <button
+                            className="rounded-md border border-slate-300 px-2 py-1"
+                            onClick={() => { setEditingId(null); setEditForm({ name: "", capacity: "", basePrice: "0" }); }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="rounded-md bg-indigo-600 px-3 py-1 text-white"
+                            onClick={() => saveEdit(t.tableId)}
+                          >
+                            Save
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="rounded-md border border-slate-300 px-2 py-1"
+                            onClick={() => startEdit(t)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
+                            onClick={() => onDelete(t.tableId)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">
                     No tables yet.
                   </td>
                 </tr>

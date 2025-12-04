@@ -1,25 +1,16 @@
 import { createContext, useCallback, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
-import { apiClient, type LoginResponse } from '../../api/client';
+import { apiClient, type LoginResponse, type User as ApiClientUser, type ProfileUpdatePayload } from '../../api/client';
 
 export const AUTH_DEBUG_TAG = "useAuth";
 
-export type User = {
-  userId?: string;
-  id?: string;
-  email: string;
-  role: string;
-  name?: string;
-  fullName?: string;
-  full_name?: string;
-  avatarUrl?: string;
-};
+export type User = ApiClientUser;
 
 export type AuthContextType = {
   user: User | null;
   setUser: (u: User | null) => void;
   loginWithCredentials: (email: string, password: string) => Promise<void>;
   signup: (data: { full_name?: string; name?: string; email: string; phone?: string; password: string }) => Promise<void>;
-  updateProfile: (data: { fullName: string; email: string; phone?: string }) => Promise<User>;
+  updateProfile: (data: ProfileUpdatePayload) => Promise<User>;
   changePassword: (data: { currentPassword: string; newPassword: string }) => Promise<void>;
   refreshProfile: () => Promise<User | null>;
   logout: () => Promise<void>;
@@ -144,23 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchMe();
   };
 
-  const updateProfile = async (data: { fullName: string; email: string; phone?: string }) => {
-    const res = await fetch("/RBOS/api/auth/me", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        fullName: data.fullName,
-        email: data.email,
-        phone: data.phone ?? "",
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error(await extractMessage(res, "Profile update failed"));
+  const updateProfile = async (data: ProfileUpdatePayload) => {
+    if (!user?.userId) {
+      throw new Error("User not authenticated");
     }
-
-    const updated = (await res.json()) as User;
+    const updated = await apiClient.updateMyProfile(user.userId, data);
     saveMe(updated);
     return updated;
   };

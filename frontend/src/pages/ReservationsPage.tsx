@@ -1,6 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiClient, type DiningTable, type Reservation } from '../api/client';
 import { useAuth } from '../features/auth/useAuth';
+import { useWebSocket } from '../hooks/useWebSocket';
+import TableMapView from '../components/TableMapView';
+import MockPaymentForm from '../components/MockPaymentForm';
 
 type BookingSettings = {
   openTime: string;
@@ -61,6 +64,9 @@ export default function ReservationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [availableTables, setAvailableTables] = useState<DiningTable[]>([]);
   const [tables, setTables] = useState<DiningTable[]>([]);
+  const [mapUrl, setMapUrl] = useState('');
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentAuthorized, setPaymentAuthorized] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [myReservations, setMyReservations] = useState<Reservation[]>([]);
   const [editing, setEditing] = useState<Record<string, Reservation>>({});
@@ -99,6 +105,15 @@ export default function ReservationsPage() {
         setTables(tbls ?? []);
       } catch (err) {
         console.error('Failed to load tables', err);
+      }
+    })();
+    (async () => {
+      try {
+        const cfg = await apiClient.getMapImageUrl();
+        setMapUrl(cfg?.url ?? '');
+      } catch (err) {
+        console.warn('Failed to load map image URL', err);
+        setMapUrl('');
       }
     })();
     loadSettings();
@@ -211,6 +226,14 @@ export default function ReservationsPage() {
     return () => { mounted = false; clearTimeout(id); };
   }, [computedStartIso, computedEndIso, form.partySize]);
 
+  const selectedTable = useMemo(() => tables.find(t => String(t.tableId) === String(form.tableId)), [tables, form.tableId]);
+  const selectedTableFee = selectedTable?.basePrice ?? 0;
+
+  const handleTableSelect = (tableId: string | number) => {
+    setForm(prev => ({ ...prev, tableId: String(tableId) }));
+    setPaymentAuthorized(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!computedStartIso || !computedEndIso) {
@@ -219,6 +242,10 @@ export default function ReservationsPage() {
     }
     if (!form.tableId) {
       alert('Please select a table.');
+      return;
+    }
+    if (selectedTableFee > 0 && !paymentAuthorized) {
+      setPaymentOpen(true);
       return;
     }
 
@@ -232,10 +259,13 @@ export default function ReservationsPage() {
         partySize: parseInt(form.partySize),
         notes: form.notes,
         status: 'pending',
+        reservationFee: selectedTableFee,
       };
 
       await apiClient.createReservation(reservationData);
       alert('Reservation request sent! We will confirm shortly.');
+      setPaymentAuthorized(false);
+      setPaymentOpen(false);
 
       // reload reservations and my reservations
       const all = await apiClient.getReservations();
@@ -356,7 +386,7 @@ export default function ReservationsPage() {
                     min="1"
                     max="20"
                     value={form.partySize}
-                    onChange={(e) => setForm(prev => ({ ...prev, partySize: e.target.value }))}
+                    onChange={(e) => setForm(prev => ({ ...prev, partySize: e.target.value, tableId: '' }))}
                     className="input"
                     placeholder="2"
                   />
@@ -367,7 +397,7 @@ export default function ReservationsPage() {
                     required
                     type="date"
                     value={form.date}
-                    onChange={(e) => setForm(prev => ({ ...prev, date: e.target.value, startTime: '' }))}
+                    onChange={(e) => setForm(prev => ({ ...prev, date: e.target.value, startTime: '', tableId: '' }))}
                     min={dateMin}
                     max={dateMax || undefined}
                     className="input"
@@ -377,7 +407,7 @@ export default function ReservationsPage() {
                 <Field label="Start Time">
                   <select
                     value={form.startTime}
-                    onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value }))}
+                    onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value, tableId: '' }))}
                     className="input"
                   >
                     <option value="">Choose time</option>
@@ -391,38 +421,54 @@ export default function ReservationsPage() {
                 <Field label="End Time">
                   <div className="input">{computedEndTime || '—'}</div>
                 </Field>
-
-                <Field label="Available Tables">
-                  {checkingAvailability ? (
-                    <div className="text-sm text-neutral-500">Checking availability...</div>
-                  ) : availableTables.length > 0 ? (
-                    <select
-                      required
-                      value={form.tableId}
-                      onChange={(e) => setForm(prev => ({ ...prev, tableId: e.target.value }))}
-                      className="input"
-                    >
-                      <option value="">Select a table</option>
-                      {availableTables.map(table => {
-                        const matched = tables.find(t => String(t.tableId) === String(table.tableId)) || table;
-                        return (
-                          <option key={matched.tableId} value={matched.tableId}>
-                            {matched.name || `Table ${matched.tableId}`} (Seats {matched.capacity})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  ) : form.date && form.startTime ? (
-                    <div className="text-sm text-rose-600">
-                      No tables available for the selected time and party size
+                <div className="text-sm text-neutral-600 space-y-1">
+                  <div className="font-semibold">Table Fee</div>
+                  {selectedTable ? (
+                    <div>
+                      {selectedTable.name} · ${selectedTableFee.toFixed(2)}
+                      {selectedTableFee > 0 && !paymentAuthorized && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            className="btn-primary px-4 py-2"
+                            onClick={() => setPaymentOpen(true)}
+                          >
+                            Pay Reservation Fee
+                          </button>
+                        </div>
+                      )}
+                      {selectedTableFee > 0 && paymentAuthorized && (
+                        <div className="mt-1 text-emerald-600 text-xs">Payment authorized</div>
+                      )}
                     </div>
                   ) : (
-                    <div className="text-sm text-neutral-500">
-                      Select date and time to see available tables
-                    </div>
+                    <div>Select a table to see fee</div>
                   )}
-                </Field>
+                </div>
               </div>
+
+              {/* Table Map View */}
+              {checkingAvailability ? (
+                <div className="text-center p-8 text-neutral-500">Checking availability...</div>
+              ) : availableTables.length > 0 ? (
+                <TableMapView
+                  allTables={tables}
+                  availableTables={availableTables}
+                  selectedTableId={form.tableId}
+                  onTableSelect={handleTableSelect}
+                  className="mt-4"
+                  mapUrl={mapUrl}
+                />
+              ) : form.date && form.startTime ? (
+                <div className="text-center p-8 text-rose-600 bg-rose-50 rounded-lg">
+                  No tables available for the selected time and party size.
+                </div>
+              ) : (
+                <div className="text-center p-8 text-neutral-500 bg-neutral-50 rounded-lg">
+                  Please select a date, time, and party size to see available tables.
+                </div>
+              )}
+
 
               {/* Additional Notes */}
               <Field label="Special Requests (Optional)">
@@ -438,7 +484,7 @@ export default function ReservationsPage() {
               <div className="pt-2">
                 <button 
                   type="submit" 
-                  disabled={submitting || availableTables.length === 0}
+                  disabled={submitting || !form.tableId || availableTables.length === 0}
                   className="btn-primary px-7 py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Booking...' : 'Book a table'}
@@ -572,6 +618,18 @@ export default function ReservationsPage() {
 
         <div className="h-20 md:h-28" />
       </section>
+
+      {paymentOpen && selectedTableFee > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg">
+            <MockPaymentForm
+              total={selectedTableFee}
+              onCancel={() => setPaymentOpen(false)}
+              onSubmit={() => { setPaymentAuthorized(true); setPaymentOpen(false); }}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

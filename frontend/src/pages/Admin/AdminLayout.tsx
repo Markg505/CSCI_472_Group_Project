@@ -18,7 +18,6 @@ const nav = [
   { name: "Tables", to: "/admin/tables" },
   { name: "Inventory", to: "/admin/inventory" },
   { name: "Reports", to: "/admin/reports" },
-  { name: "Settings", to: "/admin/settings" },
 ];
 
 function cx(...cls: Array<string | false | null | undefined>) {
@@ -124,9 +123,6 @@ export default function AdminShell() {
             <div className="border-t border-white/5 mt-2 pt-2">
               <DisclosureButton as={NavLink} to="/admin/profile" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
                 Your profile
-              </DisclosureButton>
-              <DisclosureButton as={NavLink} to="/admin/settings" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
-                Settings
               </DisclosureButton>
               <DisclosureButton as={Link} to="/" className="block px-3 py-2 text-base text-slate-300 hover:bg-white/5 rounded-md">
                 Return to site
