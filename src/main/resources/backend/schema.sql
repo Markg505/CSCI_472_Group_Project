@@ -211,7 +211,7 @@ INSERT INTO inventory (
   ('inv-11', '11', 'Tiramisu', 'DES-TIR-001', 'Dessert', 'each', 1, 12, 6, 3, 2.75, 'Dessert Cooler', 'Italian Desserts', 2, 'weekly', 'dairy'),
   ('inv-12', '12', 'Iced Tea Mix', 'BEV-TEA-001', 'Beverage', 'case', 1, 50, 25, 12, 0.75, 'Dry Storage', 'Beverage Co', 3, 'monthly', 'none');
 
--- RESERVATIONS (10)
+-- RESERVATIONS (4)
 INSERT INTO reservations
   (reservation_id, user_id, table_id, start_utc, end_utc, party_size, status, notes, created_utc)
 VALUES
@@ -222,22 +222,37 @@ VALUES
   ('2', '5', '5',  strftime('%Y-%m-%dT%H:%M:%SZ','now','+2 days','start of day','+19 hours'),
             strftime('%Y-%m-%dT%H:%M:%SZ','now','+2 days','start of day','+21 hours'),
             4, 'pending',   'Birthday',
-            strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+            strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('3', '6', '7',  strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 day','start of day','+17 hours'),
+            strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 day','start of day','+19 hours'),
+            5, 'confirmed', 'Anniversary',
+            strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
+  ('4', '7', '2',  strftime('%Y-%m-%dT%H:%M:%SZ','now','start of day','+12 hours'),
+            strftime('%Y-%m-%dT%H:%M:%SZ','now','start of day','+13 hours'),
+            2, 'confirmed', 'Lunch',
+            strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 hours'));
 
--- ORDERS (8)
+-- ORDERS (5)
 INSERT INTO orders
   (order_id, user_id, cart_token, source, status, subtotal, tax, total, created_utc)
 VALUES
   ('1', '4', NULL, 'web',    'paid',     25.00,  2.06, 27.06, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')),
   ('2', '5', NULL, 'walkin', 'paid',     32.45,  2.68, 35.13, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')),
-  ('3', '6', NULL, 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'));
+  ('3', '6', NULL, 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
+  ('4', '7', NULL, 'web',    'paid',     54.00,  4.45, 58.45, strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 hours')),
+  ('5', '8', NULL, 'phone',  'paid',     18.75,  1.55, 20.30, strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 days'));
 
--- ORDER ITEMS (16)
+-- ORDER ITEMS (10)
 INSERT INTO order_items (order_item_id, order_id, item_id, qty, unit_price, line_total, notes) VALUES
   ('1', '1', '1', 2, 12.50, 25.00, ''),
   ('2', '2', '2', 2, 13.95, 27.90, ''),
   ('3', '2', '12', 1,  3.50,  3.50, ''),
   ('4', '2', '8', 1,  1.05,  1.05, 'promo garlic bread'),
-  ('5', '3', '6', 1, 19.95, 19.95, '');
+  ('5', '3', '6', 1, 19.95, 19.95, ''),
+  ('6', '4', '7', 2, 26.00, 52.00, 'ribeye dinner'),
+  ('7', '4', '9', 1,  2.00,  2.00, 'soup starter'),
+  ('8', '5', '3', 1,  8.75,  8.75, 'caesar salad'),
+  ('9', '5', '12',1,  3.50,  3.50, ''),
+  ('10','5', '8', 1,  6.50,  6.50, 'garlic bread add-on');
 
 COMMIT;
