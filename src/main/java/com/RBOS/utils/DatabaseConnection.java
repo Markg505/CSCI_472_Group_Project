@@ -178,7 +178,8 @@ public class DatabaseConnection {
 
             if (!columnExists(conn, "orders", "created_utc")) {
                 try (Statement stmt = conn.createStatement()) {
-                    stmt.execute("ALTER TABLE orders ADD COLUMN created_utc TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))");
+                    stmt.execute(
+                            "ALTER TABLE orders ADD COLUMN created_utc TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))");
                     migrated = true;
                     System.out.println("[DB] Added missing orders.created_utc column");
                 }
@@ -293,7 +294,8 @@ public class DatabaseConnection {
     private static void backupAndRebuild(Path target) {
         try {
             if (Files.exists(target)) {
-                Path backup = target.resolveSibling(target.getFileName().toString() + ".bak-" + System.currentTimeMillis());
+                Path backup = target
+                        .resolveSibling(target.getFileName().toString() + ".bak-" + System.currentTimeMillis());
                 Files.copy(target, backup);
                 Files.delete(target);
                 System.out.println("[DB] Existing DB backed up to: " + backup);

@@ -8,7 +8,8 @@ public class DiningTable {
     private Double posX;
     private Double posY;
 
-    public DiningTable() {}
+    public DiningTable() {
+    }
 
     public DiningTable(String tableId, String name, Integer capacity) {
         this.tableId = tableId;
@@ -26,21 +27,51 @@ public class DiningTable {
     }
 
     // Getters and setters
-    public String getTableId() { return tableId; }
-    public void setTableId(String tableId) { this.tableId = tableId; }
+    public String getTableId() {
+        return tableId;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setTableId(String tableId) {
+        this.tableId = tableId;
+    }
 
-    public Integer getCapacity() { return capacity; }
-    public void setCapacity(Integer capacity) { this.capacity = capacity; }
+    public String getName() {
+        return name;
+    }
 
-    public Double getBasePrice() { return basePrice; }
-    public void setBasePrice(Double basePrice) { this.basePrice = basePrice; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public Double getPosX() { return posX; }
-    public void setPosX(Double posX) { this.posX = posX; }
+    public Integer getCapacity() {
+        return capacity;
+    }
 
-    public Double getPosY() { return posY; }
-    public void setPosY(Double posY) { this.posY = posY; }
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
+    }
+
+    public Double getBasePrice() {
+        return basePrice;
+    }
+
+    public void setBasePrice(Double basePrice) {
+        this.basePrice = basePrice;
+    }
+
+    public Double getPosX() {
+        return posX;
+    }
+
+    public void setPosX(Double posX) {
+        this.posX = posX;
+    }
+
+    public Double getPosY() {
+        return posY;
+    }
+
+    public void setPosY(Double posY) {
+        this.posY = posY;
+    }
 }

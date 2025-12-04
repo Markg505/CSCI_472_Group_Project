@@ -17,24 +17,24 @@ public class UserServlet extends HttpServlet {
     private UserDAO userDAO;
     private AuditLogDAO auditDAO;
     private ObjectMapper objectMapper;
-    
+
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         userDAO = new UserDAO(getServletContext());
         auditDAO = new AuditLogDAO(getServletContext());
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
+
             if (pathInfo == null || pathInfo.equals("/")) {
                 // Get all users
                 List<User> users = userDAO.getAllUsers();
@@ -46,10 +46,10 @@ public class UserServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                     return;
                 }
-                
+
                 String email = splits[2];
                 User user = userDAO.getUserByEmail(email);
-                
+
                 if (user != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(user));
                 } else {
@@ -65,7 +65,7 @@ public class UserServlet extends HttpServlet {
 
                 String userId = splits[1];
                 User user = userDAO.getUserById(userId);
-                
+
                 if (user != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(user));
                 } else {
@@ -79,14 +79,14 @@ public class UserServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             User user = objectMapper.readValue(request.getReader(), User.class);
             String userId = userDAO.createUser(user);
@@ -98,7 +98,7 @@ public class UserServlet extends HttpServlet {
                 try {
                     String actorId = getSessionUserId(request);
                     auditDAO.log("user", userId, "create", actorId, getSessionUserName(request),
-                                null, "User created: " + user.getEmail());
+                            null, "User created: " + user.getEmail());
                 } catch (Exception e) {
                     // Don't fail the request if audit logging fails
                     e.printStackTrace();
@@ -120,14 +120,14 @@ public class UserServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -138,7 +138,7 @@ public class UserServlet extends HttpServlet {
             String userId = pathInfo.split("/")[1];
             User user = objectMapper.readValue(request.getReader(), User.class);
             user.setUserId(userId); // Ensure the ID matches the path
-            
+
             // Get old user data for audit
             User oldUser = userDAO.getUserById(userId);
             String oldValue = oldUser != null ? objectMapper.writeValueAsString(oldUser) : null;
@@ -150,7 +150,7 @@ public class UserServlet extends HttpServlet {
                 try {
                     String actorId = getSessionUserId(request);
                     auditDAO.log("user", userId, "update", actorId, getSessionUserName(request),
-                                oldValue, objectMapper.writeValueAsString(user));
+                            oldValue, objectMapper.writeValueAsString(user));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -166,11 +166,11 @@ public class UserServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -191,7 +191,7 @@ public class UserServlet extends HttpServlet {
                 try {
                     String actorId = getSessionUserId(request);
                     auditDAO.log("user", userId, "delete", actorId, getSessionUserName(request),
-                                oldValue, null);
+                            oldValue, null);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -210,17 +210,20 @@ public class UserServlet extends HttpServlet {
 
     private String getSessionUserId(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null) return "system";
+        if (session == null)
+            return "system";
         Object userId = session.getAttribute("userId");
         return userId != null ? userId.toString() : "system";
     }
 
     private String getSessionUserName(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null) return "System";
+        if (session == null)
+            return "System";
         try {
             String userId = getSessionUserId(request);
-            if ("system".equals(userId)) return "System";
+            if ("system".equals(userId))
+                return "System";
             User user = userDAO.getUserById(userId);
             return user != null ? user.getFullName() : "System";
         } catch (Exception e) {

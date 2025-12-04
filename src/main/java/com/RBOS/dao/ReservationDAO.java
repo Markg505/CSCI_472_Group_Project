@@ -198,7 +198,8 @@ public class ReservationDAO {
         return Long.toString(n);
     }
 
-    public boolean isTableAvailable(String tableId, String startUtc, String endUtc, String excludeReservationId) throws SQLException {
+    public boolean isTableAvailable(String tableId, String startUtc, String endUtc, String excludeReservationId)
+            throws SQLException {
         String sql = "SELECT COUNT(*) FROM reservations " +
                 "WHERE table_id = ? " +
                 "AND status IN ('pending','confirmed') " +
