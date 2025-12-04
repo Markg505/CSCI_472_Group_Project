@@ -57,9 +57,13 @@ export interface MenuItemWithInventory extends MenuItem {
   };
 }
 
+export type Unit = "each" | "lb" | "oz" | "case" | "bag";
+export type CountFreq = "daily" | "weekly" | "monthly";
+export type Allergen = "none" | "gluten" | "dairy" | "eggs" | "soy" | "peanuts" | "tree-nuts" | "shellfish" | "fish" | "sesame";
+
 export interface Inventory {
   inventoryId?: string;
-  itemId: string;
+  itemId?: string;
   name: string;
   sku: string;
   category: string;

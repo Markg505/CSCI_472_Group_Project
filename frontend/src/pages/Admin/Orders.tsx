@@ -5,6 +5,7 @@ import {
   EyeIcon,
   CalendarIcon,
 } from '@heroicons/react/20/solid';
+import AuditLogButton from '../../components/AuditLogButton';
 
 const statusOptions = ['cart', 'placed', 'paid', 'cancelled'] as const;
 
@@ -204,6 +205,10 @@ export default function OrdersAdmin() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="order" label="View Change Log" />
           </span>
         </div>
       </div>

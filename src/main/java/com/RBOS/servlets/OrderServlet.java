@@ -4,6 +4,7 @@ import com.RBOS.dao.OrderDAO;
 import com.RBOS.dao.OrderItemDAO;
 import com.RBOS.dao.MenuItemDAO;
 import com.RBOS.dao.InventoryDAO;
+import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.models.Inventory;
 import com.RBOS.models.Order;
 import com.RBOS.models.OrderItem;
@@ -39,12 +40,14 @@ public class OrderServlet extends HttpServlet {
     private OrderDAO orderDAO;
     private OrderItemDAO orderItemDAO;
     private ObjectMapper objectMapper;
-    
+    private AuditLogDAO auditLogDAO;
+
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         orderDAO = new OrderDAO(getServletContext());
         orderItemDAO = new OrderItemDAO(getServletContext());
+        auditLogDAO = new AuditLogDAO(getServletContext());
     }
     
     @Override
@@ -806,6 +809,7 @@ public class OrderServlet extends HttpServlet {
                     return;
                 }
                 
+                Order before = orderDAO.getOrderById(orderId);
                 boolean success = orderDAO.updateOrderStatus(orderId, newStatus);
                 if (success) {
                     // Send status update email
@@ -843,6 +847,17 @@ public class OrderServlet extends HttpServlet {
                     // Notify via WebSocket
                     String orderJson = objectMapper.writeValueAsString(updatedOrder);
                     WebSocketConfig.notifyOrderUpdate(orderJson);
+
+                    HttpSession session = request.getSession(false);
+                    String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
+                    String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
+                    if (actingUserId != null && actingUserName != null && before != null) {
+                        Map<String, Object> oldValues = new HashMap<>();
+                        oldValues.put("status", before.getStatus());
+                        Map<String, Object> newValues = new HashMap<>();
+                        newValues.put("status", newStatus);
+                        auditLogDAO.logAction(actingUserId, actingUserName, "order", orderId, "update", oldValues, newValues);
+                    }
 
                     response.getWriter().write(objectMapper.writeValueAsString(updatedOrder));
                 } else {

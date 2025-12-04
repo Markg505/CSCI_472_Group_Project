@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../api/client';
 import { ImageUploadComponent } from '../../components/admin/ImageUploadComponent';
+import AuditLogButton from '../../components/AuditLogButton';
 import {
   PlusIcon,
   LinkIcon,
@@ -479,6 +480,10 @@ export default function MenuAdmin() {
               <LinkIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
               Export CSV
             </button>
+          </span>
+
+          <span className="hidden sm:block ml-3">
+            <AuditLogButton entityType="menu_item" label="View Change Log" />
           </span>
         </div>
       </div>
