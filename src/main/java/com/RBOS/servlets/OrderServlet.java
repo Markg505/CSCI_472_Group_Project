@@ -39,15 +39,17 @@ public class OrderServlet extends HttpServlet {
     private static final int RETENTION_MONTHS = 13;
     private OrderDAO orderDAO;
     private OrderItemDAO orderItemDAO;
+    private AuditLogDAO auditDAO;
+    private UserDAO userDAO;
     private ObjectMapper objectMapper;
-    private AuditLogDAO auditLogDAO;
 
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         orderDAO = new OrderDAO(getServletContext());
         orderItemDAO = new OrderItemDAO(getServletContext());
-        auditLogDAO = new AuditLogDAO(getServletContext());
+        auditDAO = new AuditLogDAO(getServletContext());
+        userDAO = new UserDAO(getServletContext());
     }
     
     @Override
@@ -302,10 +304,19 @@ public class OrderServlet extends HttpServlet {
                 }
                 
                 conn.commit();
-                
+
+                // Log audit
+                try {
+                    String actorId = getSessionUserId(request);
+                    auditDAO.log("order", orderId, "create", actorId, getSessionUserName(request),
+                                null, "Order created: $" + order.getTotal());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 // Send notifications
                 sendOrderNotifications(order);
-                
+
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(order));
             } else {
@@ -809,9 +820,21 @@ public class OrderServlet extends HttpServlet {
                     return;
                 }
                 
-                Order before = orderDAO.getOrderById(orderId);
+                // Get old order for audit
+                Order oldOrder = orderDAO.getOrderById(orderId);
+                String oldStatus = oldOrder != null ? oldOrder.getStatus() : null;
+
                 boolean success = orderDAO.updateOrderStatus(orderId, newStatus);
                 if (success) {
+                    // Log audit
+                    try {
+                        String actorId = getSessionUserId(request);
+                        auditDAO.log("order", orderId, "update_status", actorId, getSessionUserName(request),
+                                    "Status: " + oldStatus, "Status: " + newStatus);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
                     // Send status update email
                     try {
                         EmailService emailService = new EmailService();
@@ -847,17 +870,6 @@ public class OrderServlet extends HttpServlet {
                     // Notify via WebSocket
                     String orderJson = objectMapper.writeValueAsString(updatedOrder);
                     WebSocketConfig.notifyOrderUpdate(orderJson);
-
-                    HttpSession session = request.getSession(false);
-                    String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-                    String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
-                    if (actingUserId != null && actingUserName != null && before != null) {
-                        Map<String, Object> oldValues = new HashMap<>();
-                        oldValues.put("status", before.getStatus());
-                        Map<String, Object> newValues = new HashMap<>();
-                        newValues.put("status", newStatus);
-                        auditLogDAO.logAction(actingUserId, actingUserName, "order", orderId, "update", oldValues, newValues);
-                    }
 
                     response.getWriter().write(objectMapper.writeValueAsString(updatedOrder));
                 } else {
@@ -944,6 +956,19 @@ public class OrderServlet extends HttpServlet {
             e.printStackTrace();
         } catch (NumberFormatException e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
+    private String getSessionUserName(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) return "System";
+        try {
+            String userId = getSessionUserId(request);
+            if (userId == null) return "System";
+            User user = userDAO.getUserById(userId);
+            return user != null ? user.getFullName() : "System";
+        } catch (Exception e) {
+            return "System";
         }
     }
 

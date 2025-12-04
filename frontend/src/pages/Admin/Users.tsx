@@ -9,7 +9,7 @@ import {
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useAuth } from "../../features/auth/useAuth";
 import { apiClient, type User } from '../../api/client';
-import AuditLogButton from '../../components/AuditLogButton'; 
+import AuditLogButton from "../../components/AuditLogButton";
 
 type RawUser = Partial<User>;
 
@@ -38,7 +38,7 @@ export default function Users() {
   const [editUser, setEditUser] = useState<RawUser | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", role: "customer" });
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "", role: "customer" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", role: "customer", password: "" });
 
   const { user: me } = useAuth();
   const myRole = String(me?.role ?? "").toLowerCase();
@@ -68,16 +68,17 @@ export default function Users() {
     e.preventDefault();
     if (!isAdmin) return alert("Only admins can add users.");
     if (!form.name.trim() || !form.email.trim()) return;
+    const password = form.password.trim() || "changeme";
     try {
       await apiClient.createUser({
         fullName: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
         role: form.role as User["role"],
-        password: "changeme",
+        password,
       });
       await load();
-      setForm({ name: "", email: "", phone: "", role: "customer" });
+      setForm({ name: "", email: "", phone: "", role: "customer", password: "" });
       setShowAdd(false);
     } catch (err: any) {
       console.error("add failed", err);
@@ -248,8 +249,18 @@ export default function Users() {
                 <option value="admin">admin</option>
               </select>
             </div>
+            <div className="min-w-[200px]">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Default password</label>
+              <input
+                type="password"
+                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                placeholder="Set a temporary password"
+              />
+            </div>
             <div className="ml-auto flex gap-2">
-              <button type="button" onClick={() => { setShowAdd(false); setForm({ name: "", email: "", phone: "", role: "customer" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => { setShowAdd(false); setForm({ name: "", email: "", phone: "", role: "customer", password: "" }); }} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
               <button type="submit" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Add user</button>
             </div>
           </div>

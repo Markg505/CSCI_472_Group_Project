@@ -1,7 +1,7 @@
 package com.RBOS.servlets;
 
-import com.RBOS.dao.DiningTableDAO;
 import com.RBOS.dao.ReservationDAO;
+import com.RBOS.dao.DiningTableDAO;
 import com.RBOS.dao.AuditLogDAO;
 import com.RBOS.models.PagedResult;
 import com.RBOS.models.Reservation;
@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -31,15 +30,17 @@ public class ReservationServlet extends HttpServlet {
     private static final int RETENTION_MONTHS = 13;
     private ReservationDAO reservationDAO;
     private DiningTableDAO diningTableDAO;
+    private AuditLogDAO auditDAO;
+    private UserDAO userDAO;
     private ObjectMapper objectMapper;
-    private AuditLogDAO auditLogDAO;
 
     @Override
     public void init() throws ServletException {
         objectMapper = new ObjectMapper();
         reservationDAO = new ReservationDAO(getServletContext());
         diningTableDAO = new DiningTableDAO(getServletContext());
-        auditLogDAO = new AuditLogDAO(getServletContext());
+        auditDAO = new AuditLogDAO(getServletContext());
+        userDAO = new UserDAO(getServletContext());
     }
 
     @Override
@@ -134,23 +135,10 @@ public class ReservationServlet extends HttpServlet {
             if (reservation.getReservationId() == null || reservation.getReservationId().isBlank()) {
                 reservation.setReservationId(java.util.UUID.randomUUID().toString());
             }
-            HttpSession session = request.getSession(false);
-            String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-            String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
             String reservationId = reservationDAO.createReservation(reservation);
 
             if (reservationId != null) {
                 reservation.setReservationId(reservationId);
-
-                if (actingUserId != null && actingUserName != null) {
-                    Map<String, Object> newValues = new HashMap<>();
-                    newValues.put("tableId", reservation.getTableId());
-                    newValues.put("startUtc", reservation.getStartUtc());
-                    newValues.put("endUtc", reservation.getEndUtc());
-                    newValues.put("status", reservation.getStatus());
-                    newValues.put("partySize", reservation.getPartySize());
-                    auditLogDAO.logAction(actingUserId, actingUserName, "reservation", reservationId, "create", null, newValues);
-                }
 
                 // Send confirmation email
                 try {
@@ -331,7 +319,6 @@ public class ReservationServlet extends HttpServlet {
                         return;
                     }
 
-                    String oldStatus = existing.getStatus();
                     existing.setStatus(newStatus);
                     boolean ok = reservationDAO.updateReservation(existing);
                     if (!ok) {
@@ -341,18 +328,6 @@ public class ReservationServlet extends HttpServlet {
 
                     String reservationJson = objectMapper.writeValueAsString(existing);
                     WebSocketConfig.notifyReservationUpdate(reservationJson);
-
-                    HttpSession session = request.getSession(false);
-                    String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-                    String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
-                    if (actingUserId != null && actingUserName != null) {
-                        Map<String, Object> oldValues = new HashMap<>();
-                        oldValues.put("status", oldStatus);
-                        Map<String, Object> newValues = new HashMap<>();
-                        newValues.put("status", newStatus);
-                        auditLogDAO.logAction(actingUserId, actingUserName, "reservation", reservationId, "update", oldValues, newValues);
-                    }
-
                     response.getWriter().write(reservationJson);
                     return;
                 }

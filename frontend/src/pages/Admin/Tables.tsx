@@ -13,7 +13,7 @@ import {
   MenuItem as HUMenuItem,
   MenuItems as HUMenuItems,
 } from "@headlessui/react";
-import AuditLogButton from '../../components/AuditLogButton';
+import AuditLogButton from "../../components/AuditLogButton";
 
 export default function TablesAdmin() {
   const [rows, setRows] = useState<DiningTable[]>([]);

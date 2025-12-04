@@ -11,8 +11,6 @@ import jakarta.servlet.annotation.*;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 
 @WebServlet("/api/tables/*")
 public class DiningTableServlet extends HttpServlet {
@@ -78,20 +76,13 @@ public class DiningTableServlet extends HttpServlet {
             if (table.getName() == null || table.getName().isBlank()) {
                 table.setName("Table " + (int)(Math.random() * 1000));
             }
-            HttpSession session = request.getSession(false);
-            String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-            String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
-
             String tableId = diningTableDAO.createTable(table);
             
             if (tableId != null) {
                 table.setTableId(tableId);
-                if (actingUserId != null && actingUserName != null) {
-                    Map<String, Object> newValues = new HashMap<>();
-                    newValues.put("name", table.getName());
-                    newValues.put("capacity", table.getCapacity());
-                    auditLogDAO.logAction(actingUserId, actingUserName, "table", tableId, "create", null, newValues);
-                }
+                try {
+                    logAudit(request, "table", tableId, "create", null, objectMapper.writeValueAsString(table));
+                } catch (Exception ignored) {}
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
@@ -120,27 +111,15 @@ public class DiningTableServlet extends HttpServlet {
             }
 
             String tableId = pathInfo.split("/")[1];
-            DiningTable existing = diningTableDAO.getTableById(tableId);
             DiningTable table = objectMapper.readValue(request.getReader(), DiningTable.class);
             table.setTableId(tableId); // Ensure the ID matches the path
             
             boolean success = diningTableDAO.updateTable(table);
             
             if (success) {
-                HttpSession session = request.getSession(false);
-                String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-                String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
-                if (actingUserId != null && actingUserName != null && existing != null) {
-                    Map<String, Object> oldValues = new HashMap<>();
-                    oldValues.put("name", existing.getName());
-                    oldValues.put("capacity", existing.getCapacity());
-
-                    Map<String, Object> newValues = new HashMap<>();
-                    newValues.put("name", table.getName());
-                    newValues.put("capacity", table.getCapacity());
-
-                    auditLogDAO.logAction(actingUserId, actingUserName, "table", tableId, "update", oldValues, newValues);
-                }
+                try {
+                    logAudit(request, "table", tableId, "update", null, objectMapper.writeValueAsString(table));
+                } catch (Exception ignored) {}
                 response.getWriter().write(objectMapper.writeValueAsString(table));
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -163,18 +142,11 @@ public class DiningTableServlet extends HttpServlet {
                 return;
             }
             String tableId = pathInfo.split("/")[1];
-            DiningTable existing = diningTableDAO.getTableById(tableId);
             boolean success = diningTableDAO.deleteTable(tableId);
             if (success) {
-                HttpSession session = request.getSession(false);
-                String actingUserId = session != null ? (String) session.getAttribute("userId") : null;
-                String actingUserName = session != null ? (String) session.getAttribute("userName") : null;
-                if (actingUserId != null && actingUserName != null && existing != null) {
-                    Map<String, Object> oldValues = new HashMap<>();
-                    oldValues.put("name", existing.getName());
-                    oldValues.put("capacity", existing.getCapacity());
-                    auditLogDAO.logAction(actingUserId, actingUserName, "table", tableId, "delete", oldValues, null);
-                }
+                try {
+                    logAudit(request, "table", tableId, "delete", null, null);
+                } catch (Exception ignored) {}
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -182,6 +154,16 @@ public class DiningTableServlet extends HttpServlet {
         } catch (SQLException e) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             e.printStackTrace();
+        }
+    }
+
+    private void logAudit(HttpServletRequest req, String entityType, String entityId,
+                          String action, String oldValue, String newValue) throws Exception {
+        HttpSession session = req.getSession(false);
+        String actorId = session != null ? (String) session.getAttribute("userId") : null;
+        String actorName = session != null ? (String) session.getAttribute("userName") : null;
+        if (actorId != null) {
+            auditLogDAO.log(entityType, entityId, action, actorId, actorName, oldValue, newValue);
         }
     }
 }

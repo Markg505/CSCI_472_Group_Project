@@ -206,7 +206,6 @@ export default function OrdersAdmin() {
               Export CSV
             </button>
           </span>
-
           <span className="hidden sm:block ml-3">
             <AuditLogButton entityType="order" label="View Change Log" />
           </span>

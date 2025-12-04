@@ -66,7 +66,7 @@ CREATE TABLE menu_items (
 -- inventory
 CREATE TABLE inventory (
   inventory_id        TEXT PRIMARY KEY,
-  item_id             TEXT,
+  item_id             TEXT NULL,
   name                TEXT NOT NULL,
   sku                 TEXT UNIQUE NOT NULL,
   category            TEXT NOT NULL,
@@ -88,8 +88,8 @@ CREATE TABLE inventory (
   expiry_date         TEXT,
   allergen            TEXT CHECK (allergen IN ('none','gluten','dairy','eggs','soy','peanuts','tree-nuts','shellfish','fish','sesame')),
   conversion          TEXT,
-  created_utc         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY (item_id) REFERENCES menu_items(item_id) ON DELETE SET NULL
+  created_utc         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  -- FK removed to allow standalone inventory rows
 );
 
 -- orders

@@ -1,59 +1,28 @@
 package com.RBOS.models;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class AuditLog {
-    private String logId;
-    private String userId;
-    private String userName;
-    private String entityType;
-    private String entityId;
-    private String action;
-    private String oldValues;
-    private String newValues;
-    private String createdUtc;
+    public String logId;
+    public String entityType;
+    public String entityId;
+    public String action;
+    public String userId;
+    public String userName;
+    public String oldValue;
+    public String newValue;
+    public String createdUtc;
 
     public AuditLog() {}
 
-    public AuditLog(String logId, String userId, String userName, String entityType,
-                    String entityId, String action, String oldValues, String newValues, String createdUtc) {
+    public AuditLog(String logId, String entityType, String entityId, String action,
+                    String userId, String userName, String oldValue, String newValue, String createdUtc) {
         this.logId = logId;
-        this.userId = userId;
-        this.userName = userName;
         this.entityType = entityType;
         this.entityId = entityId;
         this.action = action;
-        this.oldValues = oldValues;
-        this.newValues = newValues;
+        this.userId = userId;
+        this.userName = userName;
+        this.oldValue = oldValue;
+        this.newValue = newValue;
         this.createdUtc = createdUtc;
     }
-
-    // Getters and setters
-    public String getLogId() { return logId; }
-    public void setLogId(String logId) { this.logId = logId; }
-
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-
-    public String getUserName() { return userName; }
-    public void setUserName(String userName) { this.userName = userName; }
-
-    public String getEntityType() { return entityType; }
-    public void setEntityType(String entityType) { this.entityType = entityType; }
-
-    public String getEntityId() { return entityId; }
-    public void setEntityId(String entityId) { this.entityId = entityId; }
-
-    public String getAction() { return action; }
-    public void setAction(String action) { this.action = action; }
-
-    public String getOldValues() { return oldValues; }
-    public void setOldValues(String oldValues) { this.oldValues = oldValues; }
-
-    public String getNewValues() { return newValues; }
-    public void setNewValues(String newValues) { this.newValues = newValues; }
-
-    public String getCreatedUtc() { return createdUtc; }
-    public void setCreatedUtc(String createdUtc) { this.createdUtc = createdUtc; }
 }

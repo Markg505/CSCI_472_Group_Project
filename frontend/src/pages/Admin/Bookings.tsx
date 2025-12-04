@@ -13,7 +13,7 @@ type BookingSettings = {
   daysOpen: { [k: string]: boolean };
   maxDaysOut: number;
   reservationLengthMinutes: number;
-  // slotIntervalMinutes removed per request — we use fixed 30min slots
+  // fixed 30min slots
 };
 
 const DEFAULT_SETTINGS: BookingSettings = {
@@ -344,7 +344,7 @@ export default function Bookings() {
   // generate available start slots for a date based on settings and existing reservations
   function generateSlotsForDate(date: string) {
     if (!settings || !date) return [] as string[];
-    const si = 30; // fixed half-hour slots per your request
+    const si = 30; // fixed half-hour slots
     const open = parseTimeToParts(settings.openTime);
     const close = parseTimeToParts(settings.closeTime);
 
@@ -369,7 +369,7 @@ export default function Bookings() {
         const re = new Date(r.endUtc).getTime();
         const ss = new Date(slotStartISO).getTime();
         const se = new Date(slotEndISO).getTime();
-        return !(se <= rs || ss >= re); // overlap if not (slot ends <= res.start OR slot starts >= res.end)
+        return !(se <= rs || ss >= re); 
       });
       if (!conflict) {
         const hh = String(cur.getHours()).padStart(2,'0');
@@ -435,7 +435,8 @@ export default function Bookings() {
             </button>
           </span>
 
-          <span className="hidden sm:block ml-3">
+
+          <span>
             <AuditLogButton entityType="reservation" label="View Change Log" />
           </span>
 
