@@ -11,10 +11,11 @@ public class AuditLog {
     public String newValue;
     public String createdUtc;
 
-    public AuditLog() {}
+    public AuditLog() {
+    }
 
     public AuditLog(String logId, String entityType, String entityId, String action,
-                    String userId, String userName, String oldValue, String newValue, String createdUtc) {
+            String userId, String userName, String oldValue, String newValue, String createdUtc) {
         this.logId = logId;
         this.entityType = entityType;
         this.entityId = entityId;

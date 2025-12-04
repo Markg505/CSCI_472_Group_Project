@@ -42,7 +42,8 @@ public class AuditLogServlet extends HttpServlet {
             UserDAO userDAO = new UserDAO(getServletContext());
             User user = userDAO.getUserById(userId);
 
-            System.out.println("AuditLogServlet: User loaded: " + (user != null ? user.getUserId() + " role=" + user.getRole() : "null"));
+            System.out.println("AuditLogServlet: User loaded: "
+                    + (user != null ? user.getUserId() + " role=" + user.getRole() : "null"));
 
             if (user == null || !"admin".equalsIgnoreCase(user.getRole())) {
                 response.setStatus(403);
@@ -101,8 +102,7 @@ public class AuditLogServlet extends HttpServlet {
                         escapeCsv(log.userId),
                         escapeCsv(log.userName),
                         escapeCsv(log.oldValue),
-                        escapeCsv(log.newValue)
-                ));
+                        escapeCsv(log.newValue)));
             }
 
             writer.flush();
@@ -123,7 +123,8 @@ public class AuditLogServlet extends HttpServlet {
         if (value == null) {
             return "";
         }
-        // If value contains comma, quote, or newline, wrap in quotes and escape existing quotes
+        // If value contains comma, quote, or newline, wrap in quotes and escape
+        // existing quotes
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
