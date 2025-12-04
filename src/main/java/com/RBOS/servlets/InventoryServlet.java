@@ -30,7 +30,6 @@ public class InventoryServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         System.out.println("InventoryServlet doGet path=" + request.getPathInfo());
-
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
@@ -154,7 +153,6 @@ public class InventoryServlet extends HttpServlet {
             String itemId = splits[2];
             String action = splits[3];
             Inventory before = inventoryDAO.getInventoryByItemId(itemId);
-
             if ("quantity".equals(action)) {
                 String quantityStr = request.getParameter("quantity");
                 if (quantityStr == null) {
