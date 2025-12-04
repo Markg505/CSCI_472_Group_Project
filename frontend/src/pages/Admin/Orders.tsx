@@ -82,17 +82,23 @@ export default function OrdersAdmin() {
   };
 
   const exportCSV = () => {
-    const header = ['ID', 'Customer', 'Status', 'Source', 'Subtotal', 'Tax', 'Total', 'Created'];
-    const lines = orders.map(order => [
-      order.orderId,
-      order.userId || 'Guest',
-      order.status,
-      order.source,
-      order.subtotal.toFixed(2),
-      order.tax.toFixed(2),
-      order.total.toFixed(2),
-      formatDate(order.createdUtc)
-    ].join(','));
+    const header = ['ID', 'Customer', 'Status', 'Source', 'Subtotal', 'Tax', 'Total', 'Items', 'Created'];
+    const lines = orders.map(order => {
+      const items = order.orderItems && order.orderItems.length
+        ? order.orderItems.map(oi => `${oi.qty}x ${oi.menuItem?.name || oi.itemId} @$${oi.unitPrice.toFixed(2)}`).join(' | ')
+        : 'No items';
+      return [
+        order.orderId,
+        order.userId || 'Guest',
+        order.status,
+        order.source,
+        order.subtotal.toFixed(2),
+        order.tax.toFixed(2),
+        order.total.toFixed(2),
+        items,
+        formatDate(order.createdUtc)
+      ].map(s => `"${String(s ?? '').replace(/"/g,'""')}"`).join(',');
+    });
     
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -109,7 +115,7 @@ export default function OrdersAdmin() {
       {/* Header */}
       <div className="lg:flex lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl/7 font-bold text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+          <h2 className="text-2xl/7 font-bold text-gray-900 sm:text-3xl sm:tracking-tight">
             Order Management
           </h2>
             <div className="mt-1 flex flex-col sm:mt-0 sm:flex-row sm:flex-wrap sm:space-x-6">
@@ -227,13 +233,14 @@ export default function OrdersAdmin() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Total</th>
+                <th className="px-3 py-2">Items</th>
                 <th className="px-3 py-2">Created</th>
                 <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {orders.map(order => (
-                <tr key={order.orderId} className="text-sm">
+                <tr key={order.orderId} className="text-sm align-top">
                   <td className="px-3 py-2 font-mono">#{order.orderId}</td>
                   <td className="px-3 py-2">Guest {order.userId || 'N/A'}</td>
                   <td className="px-3 py-2">
@@ -248,6 +255,19 @@ export default function OrdersAdmin() {
                   </td>
                   <td className="px-3 py-2 capitalize">{order.source}</td>
                   <td className="px-3 py-2 font-medium">${order.total.toFixed(2)}</td>
+                  <td className="px-3 py-2">
+                    {order.orderItems && order.orderItems.length > 0 ? (
+                      <ul className="list-disc pl-4 text-xs space-y-1 print:text-xs">
+                        {order.orderItems.map((item, idx) => (
+                          <li key={`${order.orderId}-item-${idx}`}>
+                            {item.qty} × {item.menuItem?.name || item.itemId} @ ${item.unitPrice.toFixed(2)} = ${item.lineTotal.toFixed(2)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-slate-500 text-xs">No items</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{formatDate(order.createdUtc)}</td>
                   <td className="px-3 py-2 space-x-2">
                     <button

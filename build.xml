@@ -28,6 +28,12 @@
         <isset property="env.GLASSFISH_HOME"/>
     </condition>
     <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+    <!-- Admin listener port for this domain; override with -Dglassfish.admin.port or set AS_ADMIN_PORT.
+         Defaults to 4848 (GlassFish default) for portability across machines. -->
+    <condition property="glassfish.admin.port" value="${env.AS_ADMIN_PORT}">
+        <isset property="env.AS_ADMIN_PORT"/>
+    </condition>
+    <property name="glassfish.admin.port" value="4848"/>
 
     <property name="servlet.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.servlet-api.jar"/>
     <property name="jakarta.mail.api.jar" value="${glassfish.home}/glassfish/modules/jakarta.mail-api.jar"/>
@@ -107,22 +113,12 @@
         </copy>
     </target>
 
-    <target name="-guard-db">
-        <condition property="db.in.repo">
-            <contains string="${RBOS_DB}" substring="${basedir}"/>
-        </condition>
-        <fail if="db.in.repo" message="RBOS_DB must be outside the repo (e.g., ${user.home}/.rbos/restaurant.db)."/>
-    </target>
-
-    <target name="-refresh-db" if="refresh.db">
-        <echo message="refresh.db=true set; deleting ${RBOS_DB} before regeneration."/>
-        <delete file="${RBOS_DB}" quiet="true" failonerror="false"/>
-    </target>
-
-    <target name="-init-schema" if="live.db.missing">
-        <echo message="No seed DB found; generating ${RBOS_DB} from schema.sql"/>
+    <target name="refresh-resource-db" if="refresh.db">
+        <echo message="refresh.db=true set; deleting ${SEED_DB} before regeneration."/>
+        <delete file="${SEED_DB}" quiet="true" failonerror="false"/>
+        <echo message="Generating ${SEED_DB} from schema.sql"/>
         <sql driver="org.sqlite.JDBC"
-             url="jdbc:sqlite:${RBOS_DB}"
+             url="jdbc:sqlite:${SEED_DB}"
              userid=""
              password=""
              src="${basedir}/src/main/resources/backend/schema.sql"
@@ -132,20 +128,9 @@
              onerror="abort"/>
     </target>
 
-    <target name="bootstrap-db" depends="-refresh-db">
-        <mkdir dir="${RBOS_DIR}"/>
-        <!-- best effort copy; ignore if seed file is missing -->
-        <copy file="${SEED_DB}" tofile="${RBOS_DB}" overwrite="false" verbose="true" failonerror="false"/>
-        <condition property="live.db.missing">
-            <not>
-                <available file="${RBOS_DB}"/>
-            </not>
-        </condition>
-        <antcall target="-init-schema"/>
-        <echo>Live DB: ${RBOS_DB}</echo>
-    </target>
 
-    <target name="init" depends="clean,build-frontend">
+
+    <target name="init" depends="clean,build-frontend,refresh-resource-db">
         <mkdir dir="${build.dir}"/>
         <mkdir dir="${dist.dir}"/>
         <mkdir dir="${classes.dir}"/>
@@ -251,10 +236,17 @@
         </jacoco:report>
     </target>
 
-    <target name="package-war" depends="-guard-db, bootstrap-db, compile">
-        <war destfile="${war.file}" webxml="${webinf.dir}/web.xml">
+
+    <target name="prepare-webxml" depends="init">
+        <mkdir dir="${build.dir}/WEB-INF"/>
+        <copy file="${webinf.dir}/web.xml" tofile="${build.dir}/WEB-INF/web.xml"/>
+    </target>
+
+    <target name="package-war" depends="compile, prepare-webxml">
+        <war destfile="${war.file}" webxml="${build.dir}/WEB-INF/web.xml">
             <fileset dir="${webcontent.dir}">
                 <include name="**/*"/>
+                <exclude name="WEB-INF/web.xml"/>
                 <exclude name="WEB-INF/lib/**"/>
             </fileset>
             <zipfileset dir="${webinf.dir}/lib" prefix="WEB-INF/lib">
@@ -271,6 +263,8 @@
     <target name="deploy" depends="package-war">
         <echo message="Deploying to GlassFish..."/>
         <exec executable="${glassfish.home}/bin/asadmin.bat">
+            <arg value="--port"/>
+            <arg value="${glassfish.admin.port}"/>
             <arg value="deploy"/>
             <arg value="--force=true"/>
             <arg value="${war.file}"/>

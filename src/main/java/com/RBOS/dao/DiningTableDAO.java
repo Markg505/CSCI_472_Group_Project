@@ -23,19 +23,19 @@ public class DiningTableDAO {
                 ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
-                DiningTable table = new DiningTable(
-                        rs.getString("table_id"),
-                        rs.getString("name"),
-                        rs.getInt("capacity"));
-                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
-                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
-                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
-                tables.add(table);
+                tables.add(new DiningTable(
+                    rs.getString("table_id"),
+                    rs.getString("name"),
+                    rs.getInt("capacity"),
+                    rs.getInt("pos_x"),
+                    rs.getInt("pos_y"),
+                    rs.getDouble("base_price")
+                ));
             }
         }
         return tables;
     }
-
+    
     public DiningTable getTableById(String tableId) throws SQLException {
         String sql = "SELECT * FROM dining_tables WHERE table_id = ?";
 
@@ -46,19 +46,19 @@ public class DiningTableDAO {
             ResultSet rs = pstmt.executeQuery();
 
             if (rs.next()) {
-                DiningTable table = new DiningTable(
-                        rs.getString("table_id"),
-                        rs.getString("name"),
-                        rs.getInt("capacity"));
-                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
-                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
-                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
-                return table;
+                return new DiningTable(
+                    rs.getString("table_id"),
+                    rs.getString("name"),
+                    rs.getInt("capacity"),
+                    rs.getInt("pos_x"),
+                    rs.getInt("pos_y"),
+                    rs.getDouble("base_price")
+                );
             }
         }
         return null;
     }
-
+    
     public List<DiningTable> getAvailableTables(String startUtc, String endUtc, int partySize) throws SQLException {
         List<DiningTable> tables = new ArrayList<>();
 
@@ -83,44 +83,32 @@ public class DiningTableDAO {
             ResultSet rs = pstmt.executeQuery();
 
             while (rs.next()) {
-                DiningTable table = new DiningTable(
-                        rs.getString("table_id"),
-                        rs.getString("name"),
-                        rs.getInt("capacity"));
-                table.setBasePrice(rs.getObject("base_price") != null ? rs.getDouble("base_price") : null);
-                table.setPosX(rs.getObject("pos_x") != null ? rs.getDouble("pos_x") : null);
-                table.setPosY(rs.getObject("pos_y") != null ? rs.getDouble("pos_y") : null);
-                tables.add(table);
+                tables.add(new DiningTable(
+                    rs.getString("table_id"),
+                    rs.getString("name"),
+                    rs.getInt("capacity"),
+                    rs.getInt("pos_x"),
+                    rs.getInt("pos_y"),
+                    rs.getDouble("base_price")
+                ));
             }
         }
         return tables;
     }
-
+    
     public String createTable(DiningTable table) throws SQLException {
         String tableId = table.getTableId() != null ? table.getTableId() : java.util.UUID.randomUUID().toString();
-        String sql = "INSERT INTO dining_tables (table_id, name, capacity, base_price, pos_x, pos_y) VALUES (?, ?, ?, ?, ?, ?)";
-
+        String sql = "INSERT INTO dining_tables (table_id, name, capacity, pos_x, pos_y, base_price) VALUES (?, ?, ?, ?, ?, ?)";
+        
         try (Connection conn = DatabaseConnection.getConnection(context);
-                PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
             pstmt.setString(1, tableId);
             pstmt.setString(2, table.getName());
             pstmt.setInt(3, table.getCapacity());
-            if (table.getBasePrice() != null) {
-                pstmt.setDouble(4, table.getBasePrice());
-            } else {
-                pstmt.setNull(4, Types.REAL);
-            }
-            if (table.getPosX() != null) {
-                pstmt.setDouble(5, table.getPosX());
-            } else {
-                pstmt.setNull(5, Types.REAL);
-            }
-            if (table.getPosY() != null) {
-                pstmt.setDouble(6, table.getPosY());
-            } else {
-                pstmt.setNull(6, Types.REAL);
-            }
+            pstmt.setInt(4, table.getPosX());
+            pstmt.setInt(5, table.getPosY());
+            pstmt.setDouble(6, table.getBasePrice() != null ? table.getBasePrice() : 0.0);
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -132,30 +120,29 @@ public class DiningTableDAO {
     }
 
     public boolean updateTable(DiningTable table) throws SQLException {
-        String sql = "UPDATE dining_tables SET name = ?, capacity = ?, base_price = ?, pos_x = ?, pos_y = ? WHERE table_id = ?";
-
+        String sql = "UPDATE dining_tables SET name = ?, capacity = ?, pos_x = ?, pos_y = ?, base_price = ? WHERE table_id = ?";
+        
         try (Connection conn = DatabaseConnection.getConnection(context);
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, table.getName());
             pstmt.setInt(2, table.getCapacity());
-            if (table.getBasePrice() != null) {
-                pstmt.setDouble(3, table.getBasePrice());
-            } else {
-                pstmt.setNull(3, Types.REAL);
-            }
-            if (table.getPosX() != null) {
-                pstmt.setDouble(4, table.getPosX());
-            } else {
-                pstmt.setNull(4, Types.REAL);
-            }
-            if (table.getPosY() != null) {
-                pstmt.setDouble(5, table.getPosY());
-            } else {
-                pstmt.setNull(5, Types.REAL);
-            }
+            pstmt.setInt(3, table.getPosX());
+            pstmt.setInt(4, table.getPosY());
+            pstmt.setDouble(5, table.getBasePrice() != null ? table.getBasePrice() : 0.0);
             pstmt.setString(6, table.getTableId());
+            
+            return pstmt.executeUpdate() > 0;
+        }
+    }
 
+    public boolean updateTablePosition(String tableId, int x, int y) throws SQLException {
+        String sql = "UPDATE dining_tables SET pos_x = ?, pos_y = ? WHERE table_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection(context);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, x);
+            pstmt.setInt(2, y);
+            pstmt.setString(3, tableId);
             return pstmt.executeUpdate() > 0;
         }
     }

@@ -5,8 +5,9 @@ import { useAuth } from "../features/auth/useAuth";
 import { apiClient } from "../api/client";
 import type { Order, Reservation, User, HistoryResult } from "../api/client";
 
-interface UserWithPhone extends User {
+interface UserWithPhoneAndAvatar extends User {
   phone?: string;
+  profileImageUrl?: string;
 }
 
 export default function CustomerDashboard() {
@@ -17,15 +18,18 @@ export default function CustomerDashboard() {
   const [reservationHistoryMeta, setReservationHistoryMeta] = useState<HistoryResult<Reservation> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
   const [profileForm, setProfileForm] = useState({
     fullName: user?.fullName ?? "",
     email: user?.email ?? "",
-    phone: (user as UserWithPhone)?.phone ?? "",
-    address: (user as any)?.address ?? "",
-    address2: (user as any)?.address2 ?? "",
-    city: (user as any)?.city ?? "",
-    state: (user as any)?.state ?? "",
-    postalCode: (user as any)?.postalCode ?? "",
+    phone: (user as UserWithPhoneAndAvatar)?.phone ?? "",
+    profileImageUrl: (user as UserWithPhoneAndAvatar)?.profileImageUrl ?? "",
+    address: user?.address ?? "",
+    address2: user?.address2 ?? "",
+    city: user?.city ?? "",
+    state: user?.state ?? "",
+    postalCode: user?.postalCode ?? "",
   });
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -54,14 +58,16 @@ export default function CustomerDashboard() {
     setProfileForm({
       fullName: user?.fullName ?? "",
       email: user?.email ?? "",
-      phone: (user as UserWithPhone)?.phone ?? "",
-      address: (user as any)?.address ?? "",
-      address2: (user as any)?.address2 ?? "",
-      city: (user as any)?.city ?? "",
-      state: (user as any)?.state ?? "",
-      postalCode: (user as any)?.postalCode ?? "",
+      phone: (user as UserWithPhoneAndAvatar)?.phone ?? "",
+      profileImageUrl: (user as UserWithPhoneAndAvatar)?.profileImageUrl ?? "",
+      address: user?.address ?? "",
+      address2: user?.address2 ?? "",
+      city: user?.city ?? "",
+      state: user?.state ?? "",
+      postalCode: user?.postalCode ?? "",
     });
-  }, [user?.fullName, user?.email, (user as UserWithPhone)?.phone, (user as any)?.address, (user as any)?.address2, (user as any)?.city, (user as any)?.state, (user as any)?.postalCode]);
+  }, [user?.fullName, user?.email, (user as UserWithPhoneAndAvatar)?.phone, (user as UserWithPhoneAndAvatar)?.profileImageUrl,
+      user?.address, user?.address2, user?.city, user?.state, user?.postalCode]);
 
   useEffect(() => {
     if (!user?.userId) return;
@@ -92,7 +98,15 @@ export default function CustomerDashboard() {
           page: reservationFilters.page,
           pageSize: reservationFilters.pageSize,
         });
-        setReservations(userReservations.items);
+        const startFilter = reservationFilters.startUtc ? new Date(reservationFilters.startUtc).getTime() : null;
+        const endFilter = reservationFilters.endUtc ? new Date(reservationFilters.endUtc).getTime() : null;
+        const filteredItems = userReservations.items.filter((r) => {
+          const start = new Date(r.startUtc).getTime();
+          if (startFilter !== null && start < startFilter) return false;
+          if (endFilter !== null && start > endFilter) return false;
+          return true;
+        });
+        setReservations(filteredItems);
         setReservationHistoryMeta(userReservations);
       } catch (err) {
         console.error("Error loading dashboard data:", err);
@@ -122,6 +136,15 @@ export default function CustomerDashboard() {
     ? Math.max(1, Math.ceil(reservationHistoryMeta.total / reservationHistoryMeta.pageSize))
     : 1;
 
+  function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    // Note: In a real app, you'd upload the file and get back a URL
+    setProfileForm(p => ({ ...p, profileImageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" }));
+  }
+
   const handleProfileSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setProfileError(null);
@@ -137,10 +160,14 @@ export default function CustomerDashboard() {
     }
 
     try {
+      // NOTE: The backend doesn't currently support file uploads, so we're
+      // only sending the URL. A real implementation would require a separate
+      // file upload step.
       await updateProfile({
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         phone: profileForm.phone.trim(),
+        profileImageUrl: profileForm.profileImageUrl,
         address: profileForm.address.trim(),
         address2: profileForm.address2.trim(),
         city: profileForm.city.trim(),
@@ -148,6 +175,7 @@ export default function CustomerDashboard() {
         postalCode: profileForm.postalCode.trim(),
       });
       setProfileStatus("Profile updated successfully.");
+      setPreview(null); // Clear preview after successful submission
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : "Unable to update profile.");
     }
@@ -189,7 +217,7 @@ export default function CustomerDashboard() {
 
   const onOrderDateChange = (field: "startUtc" | "endUtc", value: string) => {
     const utcValue = value
-      ? new Date(`${value}${field === "endUtc" ? "T23:59:59.999Z" : "T00:00:00Z"}`).toISOString()
+      ? new Date(`${value}T${field === "endUtc" ? "23:59:59.999" : "00:00:00"}`).toISOString()
       : "";
     setOrderFilters((prev) => ({ ...prev, [field]: utcValue, page: 1 }));
   };
@@ -200,9 +228,27 @@ export default function CustomerDashboard() {
 
   const onReservationDateChange = (field: "startUtc" | "endUtc", value: string) => {
     const utcValue = value
-      ? new Date(`${value}${field === "endUtc" ? "T23:59:59.999Z" : "T00:00:00Z"}`).toISOString()
+      ? new Date(`${value}T${field === "endUtc" ? "23:59:59.999" : "00:00:00"}`).toISOString()
       : "";
-    setReservationFilters((prev) => ({ ...prev, [field]: utcValue, page: 1 }));
+
+    setReservationFilters((prev) => {
+      let nextStart = field === "startUtc" ? utcValue : prev.startUtc;
+      let nextEnd = field === "endUtc" ? utcValue : prev.endUtc;
+
+      // Keep the range valid: if start is after end, align them
+      if (nextStart && nextEnd && new Date(nextStart) > new Date(nextEnd)) {
+        if (field === "startUtc") {
+          nextEnd = nextStart;
+        } else {
+          nextStart = nextEnd;
+        }
+      } else if (field === "startUtc" && nextStart && (!nextEnd || new Date(nextEnd) < new Date(nextStart))) {
+        // If user picks a start date with no end (or an earlier end), set end to start to keep range valid
+        nextEnd = nextStart;
+      }
+
+      return { ...prev, startUtc: nextStart, endUtc: nextEnd, page: 1 };
+    });
   };
 
   if (loading) {
@@ -244,90 +290,90 @@ export default function CustomerDashboard() {
               {profileStatus}
             </div>
           )}
-          <form onSubmit={handleProfileSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              Full Name
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.fullName}
-                onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
-                required
+          <form onSubmit={handleProfileSubmit} className="space-y-6">
+            <div className="flex items-center gap-x-4">
+               <img
+                  src={preview || user?.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
+                  alt="Current avatar"
+                  className="size-16 rounded-full bg-surface object-cover"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              Email
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.email}
-                onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))}
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              Phone
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.phone}
-                onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
-              />
-            </label>
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-mute">Account Type</p>
-              <p className="text-fg capitalize">{user?.role?.toLowerCase() || "N/A"}</p>
+              <label className="rounded-md bg-gold/10 px-3 py-2 text-sm font-semibold text-gold shadow-xs inset-ring inset-ring-gold/20 hover:bg-gold/20 cursor-pointer">
+                Change
+                <input id="photo" name="photo" type="file" accept="image/*" onChange={onAvatarChange} className="sr-only" />
+              </label>
             </div>
 
-            <label className="flex flex-col gap-1 text-sm text-mute md:col-span-2">
-              Street address
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.address}
-                onChange={(e) => setProfileForm((p) => ({ ...p, address: e.target.value }))}
-                required
-                placeholder="123 Main St"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-mute md:col-span-2">
-              Address line 2 (optional)
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.address2}
-                onChange={(e) => setProfileForm((p) => ({ ...p, address2: e.target.value }))}
-                placeholder="Apt / Suite"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              City
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.city}
-                onChange={(e) => setProfileForm((p) => ({ ...p, city: e.target.value }))}
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              State
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.state}
-                onChange={(e) => setProfileForm((p) => ({ ...p, state: e.target.value }))}
-                required
-                placeholder="CA"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-mute">
-              Postal code
-              <input
-                className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
-                value={profileForm.postalCode}
-                onChange={(e) => setProfileForm((p) => ({ ...p, postalCode: e.target.value }))}
-                required
-                placeholder="90210"
-              />
-            </label>
-
-            <div className="md:col-span-2 flex justify-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Full Name
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.fullName}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Email
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Phone
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Address
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.address}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, address: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Address 2 (Optional)
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.address2}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, address2: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                City
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.city}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, city: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                State
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.state}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, state: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-mute">
+                Postal Code
+                <input
+                  className="w-full rounded border border-white/10 bg-surface px-3 py-2 text-fg"
+                  value={profileForm.postalCode}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, postalCode: e.target.value }))}
+                />
+              </label>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-mute">Account Type</p>
+                <p className="text-fg capitalize">{user?.role?.toLowerCase() || "N/A"}</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
               <button
                 type="submit"
                 className="px-4 py-2 rounded bg-gold text-black font-semibold hover:bg-amber-300 transition"

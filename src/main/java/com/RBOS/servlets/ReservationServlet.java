@@ -225,6 +225,7 @@ public class ReservationServlet extends HttpServlet {
         String rawStatus = request.getParameter("status");
         String rawStart = request.getParameter("start_utc");
         String rawEnd = request.getParameter("end_utc");
+        System.out.println("[ReservationHistory] rawStart=" + rawStart + " rawEnd=" + rawEnd);
 
         String status;
         Instant startInstant;
@@ -245,20 +246,29 @@ public class ReservationServlet extends HttpServlet {
 
         Instant now = Instant.now();
         Instant retentionHorizon = HistoryValidation.retentionHorizon(now, RETENTION_MONTHS);
-        Instant clampedStart = HistoryValidation.clampStart(startInstant, retentionHorizon);
-        Instant clampedEnd = HistoryValidation.clampEnd(endInstant, retentionHorizon, now);
 
-        if (clampedStart.isAfter(clampedEnd)) {
+        Instant clampedStart = null;
+        Instant clampedEnd = null;
+        if (startInstant != null) {
+            clampedStart = HistoryValidation.clampStart(startInstant, retentionHorizon, now);
+        }
+        if (endInstant != null) {
+            clampedEnd = HistoryValidation.clampEnd(endInstant, retentionHorizon, now);
+        }
+
+        // Validate only when both bounds are present
+        if (clampedStart != null && clampedEnd != null && clampedStart.isAfter(clampedEnd)) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Requested range is outside the retention window");
             return;
         }
 
-        String startUtc = HistoryValidation.formatInstant(clampedStart);
-        String endUtc = HistoryValidation.formatInstant(clampedEnd);
+        String startUtc = clampedStart != null ? HistoryValidation.formatInstant(clampedStart) : null;
+        String endUtc = clampedEnd != null ? HistoryValidation.formatInstant(clampedEnd) : null;
 
         String sessionUserId = getSessionUserId(request);
         String sessionRole = getSessionRole(request);
         String requestedUserId = request.getParameter("userId");
+        System.out.println("[ReservationHistory] startUtc=" + startUtc + " endUtc=" + endUtc + " status=" + status + " userId=" + requestedUserId);
 
         String scopedUserId;
         try {
@@ -272,8 +282,8 @@ public class ReservationServlet extends HttpServlet {
             return;
         }
 
-        PagedResult<Reservation> paged = reservationDAO.getReservationsWithFilters(status, startUtc, endUtc,
-                scopedUserId, page, pageSize);
+        PagedResult<Reservation> paged = reservationDAO.getReservationsWithFilters(status, startUtc, endUtc, scopedUserId, page, pageSize);
+
         HistoryResponse<Reservation> history = new HistoryResponse<>(
                 paged.getItems(),
                 page,
@@ -418,3 +428,4 @@ public class ReservationServlet extends HttpServlet {
         }
     }
 }
+

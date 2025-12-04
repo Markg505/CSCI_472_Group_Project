@@ -66,15 +66,12 @@ public class AuditLogServlet extends HttpServlet {
         try {
             AuditLogDAO auditDAO = new AuditLogDAO(getServletContext());
 
-            // Ensure table exists
-            auditDAO.ensureTableExists();
-
             List<AuditLog> logs;
 
             if (entityType != null && !entityType.isEmpty()) {
-                logs = auditDAO.getByEntityType(entityType);
+                logs = auditDAO.getLogsByEntityType(entityType);
             } else {
-                logs = auditDAO.getAll();
+                logs = auditDAO.getAllLogs();
             }
 
             // Generate CSV

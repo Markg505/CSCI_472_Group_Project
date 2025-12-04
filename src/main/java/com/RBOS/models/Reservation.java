@@ -11,8 +11,7 @@ public class Reservation {
     private String notes;
     private String createdUtc;
     private String guestName;
-    private String contactEmail;
-    private String contactPhone;
+    private Double reservationFee;
 
     private User user;
     private DiningTable diningTable;
@@ -113,6 +112,14 @@ public class Reservation {
 
     public void setGuestName(String guestName) {
         this.guestName = guestName;
+    }
+
+    public Double getReservationFee() {
+        return reservationFee;
+    }
+
+    public void setReservationFee(Double reservationFee) {
+        this.reservationFee = reservationFee;
     }
 
     public String getContactEmail() {

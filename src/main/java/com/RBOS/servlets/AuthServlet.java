@@ -76,6 +76,7 @@ public class AuthServlet extends HttpServlet {
                 }
                 mapper.writeValue(resp.getWriter(), u);
             } catch (Exception e) {
+                e.printStackTrace();
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 mapper.writeValue(resp.getWriter(), new Msg("error"));
             }
@@ -657,6 +658,7 @@ public class AuthServlet extends HttpServlet {
         public String fullName;
         public String email;
         public String phone;
+        public String profileImageUrl;
         public String address;
         public String address2;
         public String city;
@@ -704,24 +706,32 @@ public class AuthServlet extends HttpServlet {
         public String fullName;
         public String email;
         public String phone;
+        public String profileImageUrl;
         public String address;
         public String address2;
         public String city;
         public String state;
         public String postalCode;
 
+        // 11-argument constructor (Comprehensive)
         public SafeUser(String userId, String role, String fullName, String email, String phone,
-                String address, String address2, String city, String state, String postalCode) {
+                        String profileImageUrl, String address, String address2, String city, String state, String postalCode) {
             this.userId = userId;
             this.role = role;
             this.fullName = fullName;
             this.email = email;
             this.phone = phone;
+            this.profileImageUrl = profileImageUrl;
             this.address = address;
             this.address2 = address2;
             this.city = city;
             this.state = state;
             this.postalCode = postalCode;
+        }
+
+        // 5-argument constructor (for backward compatibility in login/register)
+        public SafeUser(String userId, String role, String fullName, String email, String phone) {
+            this(userId, role, fullName, email, phone, null, null, null, null, null, null); // Call the comprehensive constructor
         }
     }
 
@@ -731,7 +741,7 @@ public class AuthServlet extends HttpServlet {
         if (user == null)
             return null;
         return new SafeUser(user.getUserId(), user.getRole(), user.getFullName(), user.getEmail(), user.getPhone(),
-                user.getAddress(), user.getAddress2(), user.getCity(), user.getState(), user.getPostalCode());
+                            user.getProfileImageUrl(), user.getAddress(), user.getAddress2(), user.getCity(), user.getState(), user.getPostalCode());
     }
 
     SafeUser updateProfile(String userId, ProfileUpdateBody body) throws SQLException {
@@ -743,20 +753,29 @@ public class AuthServlet extends HttpServlet {
         existing.setFullName(body.fullName.trim());
         existing.setEmail(body.email.trim());
         existing.setPhone(body.phone != null ? body.phone.trim() : null);
-        existing.setAddress(body.address);
-        existing.setAddress2(body.address2);
-        existing.setCity(body.city);
-        existing.setState(body.state);
-        existing.setPostalCode(body.postalCode);
+        existing.setProfileImageUrl(body.profileImageUrl != null ? body.profileImageUrl.trim() : null);
+        existing.setAddress(body.address != null ? body.address.trim() : null);
+        existing.setAddress2(body.address2 != null ? body.address2.trim() : null);
+        existing.setCity(body.city != null ? body.city.trim() : null);
+        existing.setState(body.state != null ? body.state.trim() : null);
+        existing.setPostalCode(body.postalCode != null ? body.postalCode.trim() : null);
 
-        boolean ok = dao.updateProfile(existing.getUserId(), existing.getFullName(), existing.getEmail(),
-                existing.getPhone(), existing.getAddress(), existing.getAddress2(), existing.getCity(),
-                existing.getState(), existing.getPostalCode());
+        boolean ok = dao.updateProfile(
+                existing.getUserId(),
+                existing.getFullName(),
+                existing.getEmail(),
+                existing.getPhone(),
+                existing.getProfileImageUrl(),
+                existing.getAddress(),
+                existing.getAddress2(),
+                existing.getCity(),
+                existing.getState(),
+                existing.getPostalCode()
+        );
         if (!ok)
             return null;
         return new SafeUser(existing.getUserId(), existing.getRole(), existing.getFullName(), existing.getEmail(),
-                existing.getPhone(), existing.getAddress(), existing.getAddress2(), existing.getCity(),
-                existing.getState(), existing.getPostalCode());
+                existing.getPhone(), existing.getProfileImageUrl(), existing.getAddress(), existing.getAddress2(), existing.getCity(), existing.getState(), existing.getPostalCode());
     }
 
     boolean updatePassword(String userId, PasswordChangeBody body) throws SQLException {
