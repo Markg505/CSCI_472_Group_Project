@@ -220,16 +220,18 @@ export default function TablesAdmin() {
         </div>
 
         <div className="mt-5 flex lg:mt-0 lg:ml-4">
-          <span className="hidden sm:block">
-            <button
-              type="button"
-              onClick={() => setShowAdd(s => !s)}
-              className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50"
-            >
-              <PencilIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
-              New table
-            </button>
-          </span>
+          {isAdmin && (
+            <span className="hidden sm:block">
+              <button
+                type="button"
+                onClick={() => setShowAdd(s => !s)}
+                className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50"
+              >
+                <PencilIcon className="mr-1.5 -ml-0.5 size-5 text-gray-400" />
+                New table
+              </button>
+            </span>
+          )}
 
           <span className="hidden sm:block ml-3">
             <button
@@ -267,14 +269,16 @@ export default function TablesAdmin() {
               transition
               className="absolute left-0 z-10 mt-2 -mr-1 w-28 origin-top-right rounded-md bg-white py-1 shadow-lg outline outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-200 data-enter:ease-out data-leave:duration-75 data-leave:ease-in"
             >
-              <HUMenuItem>
-                <button
-                  onClick={() => setShowAdd(true)}
-                  className="block w-full px-4 py-2 text-left text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
-                >
-                  New
-                </button>
-              </HUMenuItem>
+              {isAdmin && (
+                <HUMenuItem>
+                  <button
+                    onClick={() => setShowAdd(true)}
+                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
+                  >
+                    New
+                  </button>
+                </HUMenuItem>
+              )}
               <HUMenuItem>
                 <button
                   onClick={exportCSV}
@@ -391,7 +395,7 @@ export default function TablesAdmin() {
               {rows.map(t => (
                 <tr key={t.tableId} className="text-sm">
                   <td className="px-3 py-2">
-                    {editing?.tableId === t.tableId ? (
+                    {isAdmin && editing?.tableId === t.tableId ? (
                       <input
                         className="w-full rounded-md border border-slate-300 px-2 py-1"
                         value={editForm.name}
@@ -400,7 +404,7 @@ export default function TablesAdmin() {
                     ) : (t.name || t.tableId)}
                   </td>
                   <td className="px-3 py-2">
-                    {editing?.tableId === t.tableId ? (
+                    {isAdmin && editing?.tableId === t.tableId ? (
                       <input
                         type="number"
                         className="w-20 rounded-md border border-slate-300 px-2 py-1"
@@ -410,7 +414,7 @@ export default function TablesAdmin() {
                     ) : t.capacity}
                   </td>
                   <td className="px-3 py-2">
-                    {editing?.tableId === t.tableId ? (
+                    {isAdmin && editing?.tableId === t.tableId ? (
                       <input
                         type="number"
                         className="w-24 rounded-md border border-slate-300 px-2 py-1"
@@ -422,7 +426,7 @@ export default function TablesAdmin() {
                     ) : `$${(t.basePrice ?? 0).toFixed(2)}`}
                   </td>
                   <td className="px-3 py-2">
-                    {editing?.tableId === t.tableId ? (
+                    {isAdmin && editing?.tableId === t.tableId ? (
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -444,36 +448,40 @@ export default function TablesAdmin() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {editing?.tableId === t.tableId ? (
-                      <div className="space-x-2">
-                        <button
-                          onClick={saveEdit}
-                          className="rounded-md border px-2 py-1 text-sm bg-indigo-600 text-white hover:bg-indigo-500"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="rounded-md border px-2 py-1 text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                    {isAdmin ? (
+                      editing?.tableId === t.tableId ? (
+                        <div className="space-x-2">
+                          <button
+                            onClick={saveEdit}
+                            className="rounded-md border px-2 py-1 text-sm bg-indigo-600 text-white hover:bg-indigo-500"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="rounded-md border px-2 py-1 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-x-2">
+                          <button
+                            onClick={() => startEdit(t)}
+                            className="rounded-md border px-2 py-1 text-sm border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
+                            onClick={() => onDelete(t.tableId)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )
                     ) : (
-                      <div className="space-x-2">
-                        <button
-                          onClick={() => startEdit(t)}
-                          className="rounded-md border px-2 py-1 text-sm border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 hover:bg-rose-100"
-                          onClick={() => onDelete(t.tableId)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <span className="text-sm text-slate-400">View only</span>
                     )}
                   </td>
                 </tr>
