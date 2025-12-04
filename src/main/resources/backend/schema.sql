@@ -21,6 +21,11 @@ CREATE TABLE users (
   full_name      TEXT NOT NULL,
   email          TEXT UNIQUE,
   phone          TEXT,
+  address        TEXT,
+  address2       TEXT,
+  city           TEXT,
+  state          TEXT,
+  postal_code    TEXT,
   password_hash  TEXT
 );
 
@@ -28,7 +33,10 @@ CREATE TABLE users (
 CREATE TABLE dining_tables (
   table_id   TEXT PRIMARY KEY,
   name       TEXT NOT NULL UNIQUE,
-  capacity   INTEGER NOT NULL CHECK (capacity > 0)
+  capacity   INTEGER NOT NULL CHECK (capacity > 0),
+  base_price REAL DEFAULT 0.0,
+  pos_x      REAL,
+  pos_y      REAL
 );
 
 -- reservations
@@ -36,6 +44,8 @@ CREATE TABLE reservations (
   reservation_id TEXT PRIMARY KEY,
   user_id        TEXT,
   guest_name     TEXT,
+  contact_email  TEXT,
+  contact_phone  TEXT,
   table_id       TEXT NOT NULL,
   start_utc      TEXT NOT NULL,
   end_utc        TEXT NOT NULL,
@@ -105,6 +115,7 @@ CREATE TABLE orders (
   total       REAL NOT NULL DEFAULT 0.0,
   customer_name TEXT,
   customer_phone TEXT,
+  customer_email TEXT,
   delivery_address TEXT,
   delivery_address2 TEXT,
   delivery_city TEXT,
@@ -155,15 +166,15 @@ BEGIN TRANSACTION;
 
 -- USERS (8)
 -- Default passwords: admin123 for admin, customer123 for customers, staff123 for staff
-INSERT INTO users (user_id, role, full_name, email, phone, password_hash) VALUES
-  ('1', 'admin',    'Admin Admin',     'admin@rbos.com',   '555-1001', 'admin123'),
-  ('2', 'staff',    'Jordan Kim',      'jordan@rbos.com',  '555-1002', 'staff123'),
-  ('3', 'staff',    'Riley Nguyen',    'riley@rbos.com',   '555-1003', 'staff123'),
-  ('4', 'customer', 'Marcus Giannini', 'marcus@example.com', '555-2001', 'customer123'),
-  ('5', 'customer', 'Sam Taylor',      'sam@example.com',    '555-2002', 'customer123'),
-  ('6', 'customer', 'Casey Lee',       'casey@example.com',  '555-2003', 'customer123'),
-  ('7', 'customer', 'Morgan Diaz',     'morgan@example.com', '555-2004', 'customer123'),
-  ('8', 'customer', 'Jamie Fox',       'jamie@example.com',  '555-2005', 'customer123');
+INSERT INTO users (user_id, role, full_name, email, phone, address, address2, city, state, postal_code, password_hash) VALUES
+  ('1', 'admin',    'Admin Admin',     'admin@rbos.com',     '555-1001', '123 Admin St', NULL, 'Admin City', 'AA', '00000', 'admin123'),
+  ('2', 'staff',    'Jordan Kim',      'jordan@rbos.com',    '555-1002', '456 Staff Rd', NULL, 'Staffville', 'SS', '11111', 'staff123'),
+  ('3', 'staff',    'Riley Nguyen',    'riley@rbos.com',     '555-1003', '789 Team Ln',  NULL, 'Teamtown',   'SS', '22222', 'staff123'),
+  ('4', 'customer', 'Marcus Giannini', 'marcus@example.com', '555-2001', '123 Fake Street', NULL, 'Portales', 'NM', '90210', 'customer123'),
+  ('5', 'customer', 'Sam Taylor',      'sam@example.com',    '555-2002', '10 Elm St', NULL, 'Springfield', 'IL', '62701', 'customer123'),
+  ('6', 'customer', 'Casey Lee',       'casey@example.com',  '555-2003', '22 Pine Ave', NULL, 'Portland', 'OR', '97201', 'customer123'),
+  ('7', 'customer', 'Morgan Diaz',     'morgan@example.com', '555-2004', '55 Lake Rd', NULL, 'Austin', 'TX', '73301', 'customer123'),
+  ('8', 'customer', 'Jamie Fox',       'jamie@example.com',  '555-2005', '77 Market St', NULL, 'Denver', 'CO', '80202', 'customer123');
 
 -- DINING TABLES (10)
 INSERT INTO dining_tables (table_id, name, capacity) VALUES
@@ -211,7 +222,7 @@ INSERT INTO inventory (
   ('inv-11', '11', 'Tiramisu', 'DES-TIR-001', 'Dessert', 'each', 1, 12, 6, 3, 2.75, 'Dessert Cooler', 'Italian Desserts', 2, 'weekly', 'dairy'),
   ('inv-12', '12', 'Iced Tea Mix', 'BEV-TEA-001', 'Beverage', 'case', 1, 50, 25, 12, 0.75, 'Dry Storage', 'Beverage Co', 3, 'monthly', 'none');
 
--- RESERVATIONS (10)
+-- RESERVATIONS (4)
 INSERT INTO reservations
   (reservation_id, user_id, table_id, start_utc, end_utc, party_size, status, notes, created_utc)
 VALUES
@@ -222,22 +233,37 @@ VALUES
   ('2', '5', '5',  strftime('%Y-%m-%dT%H:%M:%SZ','now','+2 days','start of day','+19 hours'),
             strftime('%Y-%m-%dT%H:%M:%SZ','now','+2 days','start of day','+21 hours'),
             4, 'pending',   'Birthday',
-            strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+            strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('3', '6', '7',  strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 day','start of day','+17 hours'),
+            strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 day','start of day','+19 hours'),
+            5, 'confirmed', 'Anniversary',
+            strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
+  ('4', '7', '2',  strftime('%Y-%m-%dT%H:%M:%SZ','now','start of day','+12 hours'),
+            strftime('%Y-%m-%dT%H:%M:%SZ','now','start of day','+13 hours'),
+            2, 'confirmed', 'Lunch',
+            strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 hours'));
 
--- ORDERS (8)
+-- ORDERS (5)
 INSERT INTO orders
   (order_id, user_id, cart_token, source, status, subtotal, tax, total, created_utc)
 VALUES
   ('1', '4', NULL, 'web',    'paid',     25.00,  2.06, 27.06, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')),
   ('2', '5', NULL, 'walkin', 'paid',     32.45,  2.68, 35.13, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')),
-  ('3', '6', NULL, 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'));
+  ('3', '6', NULL, 'web',    'placed',   19.95,  1.65, 21.60, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
+  ('4', '7', NULL, 'web',    'paid',     54.00,  4.45, 58.45, strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 hours')),
+  ('5', '8', NULL, 'phone',  'paid',     18.75,  1.55, 20.30, strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 days'));
 
--- ORDER ITEMS (16)
+-- ORDER ITEMS (10)
 INSERT INTO order_items (order_item_id, order_id, item_id, qty, unit_price, line_total, notes) VALUES
   ('1', '1', '1', 2, 12.50, 25.00, ''),
   ('2', '2', '2', 2, 13.95, 27.90, ''),
   ('3', '2', '12', 1,  3.50,  3.50, ''),
   ('4', '2', '8', 1,  1.05,  1.05, 'promo garlic bread'),
-  ('5', '3', '6', 1, 19.95, 19.95, '');
+  ('5', '3', '6', 1, 19.95, 19.95, ''),
+  ('6', '4', '7', 2, 26.00, 52.00, 'ribeye dinner'),
+  ('7', '4', '9', 1,  2.00,  2.00, 'soup starter'),
+  ('8', '5', '3', 1,  8.75,  8.75, 'caesar salad'),
+  ('9', '5', '12',1,  3.50,  3.50, ''),
+  ('10','5', '8', 1,  6.50,  6.50, 'garlic bread add-on');
 
 COMMIT;

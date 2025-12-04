@@ -251,14 +251,14 @@ public class OrderDAO {
     public String createOrder(Order order, Connection conn) throws SQLException {
         String orderId = order.getOrderId();
         if (orderId == null || orderId.isBlank()) {
-            orderId = java.util.UUID.randomUUID().toString();
+            orderId = java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L) + "";
             order.setOrderId(orderId);
         }
 
         String sql = "INSERT INTO orders (order_id, user_id, cart_token, source, status, fulfillment_type, " +
-                "subtotal, tax, total, customer_name, customer_phone, delivery_address, delivery_address2, " +
+                "subtotal, tax, total, customer_name, customer_phone, customer_email, delivery_address, delivery_address2, " +
                 "delivery_city, delivery_state, delivery_postal_code, delivery_instructions) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, orderId);
@@ -278,12 +278,13 @@ public class OrderDAO {
             // customer/delivery params
             pstmt.setString(10, order.getCustomerName());
             pstmt.setString(11, order.getCustomerPhone());
-            pstmt.setString(12, order.getDeliveryAddress());
-            pstmt.setString(13, order.getDeliveryAddress2());
-            pstmt.setString(14, order.getDeliveryCity());
-            pstmt.setString(15, order.getDeliveryState());
-            pstmt.setString(16, order.getDeliveryPostalCode());
-            pstmt.setString(17, order.getDeliveryInstructions());
+            pstmt.setString(12, order.getCustomerEmail());
+            pstmt.setString(13, order.getDeliveryAddress());
+            pstmt.setString(14, order.getDeliveryAddress2());
+            pstmt.setString(15, order.getDeliveryCity());
+            pstmt.setString(16, order.getDeliveryState());
+            pstmt.setString(17, order.getDeliveryPostalCode());
+            pstmt.setString(18, order.getDeliveryInstructions());
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -309,6 +310,9 @@ public class OrderDAO {
                                 }
                             }
                         }
+                    }
+                    if ((customerEmail == null || customerEmail.isBlank()) && order.getCustomerEmail() != null) {
+                        customerEmail = order.getCustomerEmail();
                     }
 
                     // Only send email if we have a valid email address
@@ -359,7 +363,7 @@ public class OrderDAO {
 
     public boolean updateOrder(Order order) throws SQLException {
         String sql = "UPDATE orders SET user_id = ?, cart_token = ?, source = ?, status = ?, fulfillment_type = ?, " +
-                "subtotal = ?, tax = ?, total = ?, customer_name = ?, customer_phone = ?, delivery_address = ?, " +
+                "subtotal = ?, tax = ?, total = ?, customer_name = ?, customer_phone = ?, customer_email = ?, delivery_address = ?, " +
                 "delivery_address2 = ?, delivery_city = ?, delivery_state = ?, delivery_postal_code = ?, " +
                 "delivery_instructions = ? WHERE order_id = ?";
 
@@ -377,14 +381,15 @@ public class OrderDAO {
 
             pstmt.setString(9, order.getCustomerName());
             pstmt.setString(10, order.getCustomerPhone());
-            pstmt.setString(11, order.getDeliveryAddress());
-            pstmt.setString(12, order.getDeliveryAddress2());
-            pstmt.setString(13, order.getDeliveryCity());
-            pstmt.setString(14, order.getDeliveryState());
-            pstmt.setString(15, order.getDeliveryPostalCode());
-            pstmt.setString(16, order.getDeliveryInstructions());
+            pstmt.setString(11, order.getCustomerEmail());
+            pstmt.setString(12, order.getDeliveryAddress());
+            pstmt.setString(13, order.getDeliveryAddress2());
+            pstmt.setString(14, order.getDeliveryCity());
+            pstmt.setString(15, order.getDeliveryState());
+            pstmt.setString(16, order.getDeliveryPostalCode());
+            pstmt.setString(17, order.getDeliveryInstructions());
 
-            pstmt.setString(17, order.getOrderId());
+            pstmt.setString(18, order.getOrderId());
 
             return pstmt.executeUpdate() > 0;
         }
@@ -568,6 +573,7 @@ public class OrderDAO {
         // map customer/delivery fields
         order.setCustomerName(rs.getString("customer_name"));
         order.setCustomerPhone(rs.getString("customer_phone"));
+        order.setCustomerEmail(rs.getString("customer_email"));
         order.setDeliveryAddress(rs.getString("delivery_address"));
         order.setDeliveryAddress2(rs.getString("delivery_address2"));
         order.setDeliveryCity(rs.getString("delivery_city"));

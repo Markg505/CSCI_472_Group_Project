@@ -202,6 +202,74 @@ public class DatabaseConnection {
                 }
             }
 
+            if (!columnExists(conn, "reservations", "contact_email")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE reservations ADD COLUMN contact_email TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing reservations.contact_email column");
+                }
+            }
+
+            if (!columnExists(conn, "reservations", "contact_phone")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE reservations ADD COLUMN contact_phone TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing reservations.contact_phone column");
+                }
+            }
+
+            // Ensure users table has contact/address columns used by auth servlet
+            if (!columnExists(conn, "users", "phone")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN phone TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.phone column");
+                }
+            }
+            if (!columnExists(conn, "users", "address")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN address TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.address column");
+                }
+            }
+            if (!columnExists(conn, "users", "address2")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN address2 TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.address2 column");
+                }
+            }
+            if (!columnExists(conn, "users", "city")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN city TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.city column");
+                }
+            }
+            if (!columnExists(conn, "users", "state")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN state TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.state column");
+                }
+            }
+            if (!columnExists(conn, "users", "postal_code")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE users ADD COLUMN postal_code TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing users.postal_code column");
+                }
+            }
+
+            if (!columnExists(conn, "orders", "customer_email")) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE orders ADD COLUMN customer_email TEXT");
+                    migrated = true;
+                    System.out.println("[DB] Added missing orders.customer_email column");
+                }
+            }
+
             if (!migrated) {
                 return;
             }

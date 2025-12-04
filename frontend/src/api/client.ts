@@ -1,5 +1,5 @@
 const BASE = (import.meta as any)?.env?.BASE_URL || '/';
-const API_BASE = `${BASE}api`;
+export const API_BASE = `${BASE}api`;
 
 const KEY = "RBOS_INVENTORY_FULL_DROPDOWN";
 const MAX_HISTORY_PAGE_SIZE = 100;
@@ -22,12 +22,17 @@ export interface DiningTable {
   tableId: string;
   name: string;
   capacity: number;
+  basePrice?: number;
+  posX?: number;
+  posY?: number;
 }
 
 export interface Reservation {
   reservationId?: string;
   userId?: string;
   guestName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   tableId: string;
   startUtc: string;
   endUtc: string;
@@ -91,6 +96,7 @@ export interface Inventory {
 
 export interface Order {
   orderId?: string;
+  orderNumber?: string;
   userId?: string;
   source: 'web' | 'phone' | 'walkin';
   status: 'cart' | 'placed' | 'paid' | 'cancelled';
@@ -102,6 +108,7 @@ export interface Order {
   orderItems?: OrderItem[];
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
   deliveryAddress?: string;
   deliveryAddress2?: string;
   deliveryCity?: string;
@@ -200,6 +207,7 @@ export interface SalesAnalytics {
   revenueTimeline: Array<{ date: string; revenue: number }>;
   orderCountTimeline: Array<{ date: string; count: number }>;
   sourceDistribution: Array<{ source: string; count: number }>;
+  sourceTotals?: Array<{ source: string; revenue: number; count: number }>;
   totalRevenue: number;
   totalOrders: number;
   avgOrderValue: number;
@@ -217,6 +225,7 @@ export interface MenuPerformance {
   topItems: Array<{
     itemId: string;
     name: string;
+    category?: string;
     revenue: number;
     quantity: number;
     price: number;
@@ -224,6 +233,17 @@ export interface MenuPerformance {
   categoryPerformance: Array<{ category: string; revenue: number }>;
   totalMenuItems: number;
   activeMenuItems: number;
+}
+
+export interface AuditLogEntry {
+  timestamp: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  userId: string;
+  userName: string;
+  oldValue?: string;
+  newValue?: string;
 }
 export interface BookingSettings {
   openTime: string;                 
@@ -253,7 +273,6 @@ class ApiClient {
         localStorage.removeItem('rbos_cart_token');
       }
     } catch {
-      // ignore storage errors
     }
   }
 
@@ -352,6 +371,10 @@ async createUser(payload: Partial<User> & { password?: string }): Promise<User> 
 
   async getReservations(): Promise<Reservation[]> {
     return this.request('/reservations');
+  }
+
+  async getReservationById(reservationId: string): Promise<Reservation> {
+    return this.request(`/reservations/${encodeURIComponent(reservationId)}`);
   }
 
   async getReservationHistory(params: { status?: string; startUtc?: string; endUtc?: string; userId?: string; page?: number; pageSize?: number; }): Promise<HistoryResult<Reservation>> {
@@ -571,6 +594,49 @@ async updateBookingSettings(settings: BookingSettings): Promise<BookingSettings>
   async getMenuPerformance(): Promise<MenuPerformance> {
     return this.request('/reports/menu-performance');
   }
+
+  async getAuditLogEntries(entityType?: string): Promise<AuditLogEntry[]> {
+    const query = entityType ? `?entityType=${encodeURIComponent(entityType)}` : '';
+    const response = await fetch(`${this.baseURL}/audit-log/export${query}`, {
+      headers: { Accept: 'text/csv' },
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error(`Audit log export failed: ${response.status}`);
+    }
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    const entries: AuditLogEntry[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      if (cols.length < 8) continue;
+      const [timestamp, eType, entityId, action, userId, userName, oldValue, newValue] = cols;
+      entries.push({ timestamp, entityType: eType, entityId, action, userId, userName, oldValue, newValue });
+    }
+    return entries;
+  }
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 export const apiClient = new ApiClient();

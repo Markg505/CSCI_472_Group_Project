@@ -3,6 +3,7 @@ import { apiClient, type OrderItem } from '../../api/client';
 import { useAuth } from '../auth/useAuth';
 
 export interface CartItem {
+  cartLineId: string;
   itemId: string;
   name: string;
   price: number;
@@ -30,8 +31,8 @@ interface PersistedCartState {
 const CART_STORAGE_KEY = 'rbos_cart';
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: Omit<CartItem, 'qty' | 'lineTotal'> }
-  | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; qty: number } }
+  | { type: 'ADD_ITEM'; payload: Omit<CartItem, 'qty' | 'lineTotal' | 'cartLineId'> & { cartLineId?: string } }
+  | { type: 'UPDATE_QUANTITY'; payload: { cartLineId: string; qty: number } }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'CLEAR_CART' }
   | { type: 'HYDRATE'; payload: CartState }
@@ -53,7 +54,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       if (existingItem) {
         const updatedItems = state.items.map(item =>
-          item.itemId === action.payload.itemId && (item.notes || '') === (action.payload.notes || '')
+          item.cartLineId === existingItem.cartLineId
             ? {
                 ...item,
                 qty: item.qty + 1,
@@ -66,6 +67,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       const newItem: CartItem = {
         ...action.payload,
+        cartLineId: action.payload.cartLineId || `${action.payload.itemId}|${action.payload.notes || ''}|${Date.now()}`,
         qty: 1,
         lineTotal: action.payload.price
       };
@@ -75,11 +77,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
     case 'UPDATE_QUANTITY': {
       if (action.payload.qty <= 0) {
-        return cartReducer(state, { type: 'REMOVE_ITEM', payload: action.payload.itemId });
+        return cartReducer(state, { type: 'REMOVE_ITEM', payload: action.payload.cartLineId });
       }
 
       const updatedItems = state.items.map(item =>
-        item.itemId === action.payload.itemId
+        item.cartLineId === action.payload.cartLineId
           ? {
               ...item,
               qty: action.payload.qty,
@@ -92,7 +94,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
 
     case 'REMOVE_ITEM': {
-      const updatedItems = state.items.filter(item => item.itemId !== action.payload);
+      const updatedItems = state.items.filter(item => item.cartLineId !== action.payload);
       return calculateTotals(updatedItems, state.cartToken);
     }
 
@@ -115,21 +117,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 }
 
 function calculateTotals(items: CartItem[], cartToken?: string | null, banners: string[] = []): CartState {
-  const deduped: Record<string, CartItem> = {};
-  for (const item of items) {
-    const existing = deduped[item.itemId];
-    if (existing) {
-      const qty = existing.qty + item.qty;
-      deduped[item.itemId] = {
-        ...existing,
-        qty,
-        lineTotal: qty * existing.price
-      };
-    } else {
-      deduped[item.itemId] = { ...item };
-    }
-  }
-  const normalizedItems = Object.values(deduped);
+  const normalizedItems = items.map(item => ({
+    ...item,
+    lineTotal: item.qty * item.price
+  }));
   const subtotal = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
@@ -138,7 +129,10 @@ function calculateTotals(items: CartItem[], cartToken?: string | null, banners: 
 }
 
 function normalizeCartState(raw?: Partial<CartState>): CartState {
-  const items = raw?.items ?? [];
+  const items = (raw?.items ?? []).map((item, idx) => ({
+    ...item,
+    cartLineId: item.cartLineId || `${item.itemId}|${item.notes || ''}|${idx}`
+  }));
   const computed = calculateTotals(items, raw?.cartToken ?? null, raw?.banners ?? []);
 
   return {
@@ -212,7 +206,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         itemId: item.itemId,
         qty: item.qty,
         unitPrice: item.price,
-        name: item.name
+        name: item.name,
+        notes: item.notes
       }));
 
       try {
@@ -244,8 +239,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const banners = buildBannerMessages(conflicts);
         dispatch({ type: 'SET_BANNERS', payload: banners });
         lastSyncedSignature.current = buildSyncSignature(hydrated, user?.userId ?? null);
-      } catch (error) {
+      } catch (error: any) {
+        const msg = String(error?.message ?? '');
         console.error('Failed to sync cart with server', error);
+        // If the cart token is bound to another user or forbidden, reset the token so the user can start fresh
+        if (msg.includes('403') || msg.toLowerCase().includes('forbidden')) {
+          apiClient.updateCartToken(null);
+          setCartToken(null);
+          lastSyncedSignature.current = null;
+          // keep local items; next sync will generate a fresh cart token
+        }
         dispatch({ type: 'SET_BANNERS', payload: [] });
       }
     };
@@ -265,6 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 function buildStateFromOrder(orderItems: OrderItem[], subtotal: number, tax: number, total: number, cartToken?: string | null): CartState {
   const items: CartItem[] = orderItems.map(item => ({
+    cartLineId: `${item.itemId}|${item.notes || ''}|${Math.random().toString(36).slice(2)}`,
     itemId: item.itemId,
     name: item.menuItem?.name ?? '',
     price: item.unitPrice ?? 0,
@@ -285,7 +289,7 @@ function buildStateFromOrder(orderItems: OrderItem[], subtotal: number, tax: num
 
 function buildSyncSignature(state: CartState, userId: string | null) {
   const normalized = [...state.items]
-    .map(item => `${item.itemId}:${item.qty}`)
+    .map(item => `${item.itemId}:${item.qty}:${item.notes || ''}`)
     .sort()
     .join('|');
   return `${userId ?? 'guest'}|${state.cartToken ?? ''}|${normalized}`;
