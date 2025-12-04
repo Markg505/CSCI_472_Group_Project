@@ -26,8 +26,8 @@ public class MenuItemDAO {
         String sql = "SELECT item_id, name, description, category, price, active, image_url, dietary_tags, out_of_stock FROM menu_items ORDER BY item_id";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
@@ -40,8 +40,7 @@ public class MenuItemDAO {
                         rs.getDouble("price"),
                         active,
                         rs.getString("image_url"),
-                        rs.getString("dietary_tags")
-                );
+                        rs.getString("dietary_tags"));
                 item.setOutOfStock(outOfStock);
                 menuItems.add(item);
             }
@@ -54,8 +53,8 @@ public class MenuItemDAO {
         String sql = "SELECT * FROM menu_items WHERE active = 1 ORDER BY item_id";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
@@ -68,20 +67,19 @@ public class MenuItemDAO {
                         rs.getDouble("price"),
                         active,
                         rs.getString("image_url"),
-                        rs.getString("dietary_tags")
-                );
+                        rs.getString("dietary_tags"));
                 item.setOutOfStock(outOfStock);
                 menuItems.add(item);
             }
         }
         return menuItems;
     }
-    
+
     public MenuItem getMenuItemById(String itemId) throws SQLException {
         String sql = "SELECT * FROM menu_items WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, itemId);
             ResultSet rs = pstmt.executeQuery();
@@ -90,15 +88,14 @@ public class MenuItemDAO {
                 boolean active = rs.getInt("active") == 1;
                 boolean outOfStock = rs.getInt("out_of_stock") == 1;
                 MenuItem item = new MenuItem(
-                    rs.getString("item_id"),
-                    rs.getString("name"),
-                    rs.getString("description"),
-                    rs.getString("category"),
-                    rs.getDouble("price"),
-                    active,
-                    rs.getString("image_url"),
-                    rs.getString("dietary_tags")
-                );
+                        rs.getString("item_id"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getString("category"),
+                        rs.getDouble("price"),
+                        active,
+                        rs.getString("image_url"),
+                        rs.getString("dietary_tags"));
                 item.setOutOfStock(outOfStock);
                 return item;
             }
@@ -109,29 +106,28 @@ public class MenuItemDAO {
     public List<MenuItemWithInventory> getActiveMenuItemsWithInventory() throws SQLException {
         List<MenuItemWithInventory> menuItems = new ArrayList<>();
         String sql = "SELECT m.*, i.qty_on_hand, i.par_level, i.reorder_point, " +
-                    "CASE WHEN i.qty_on_hand > 0 THEN 1 ELSE 0 END as available " +
-                    "FROM menu_items m " +
-                    "LEFT JOIN inventory i ON m.item_id = i.item_id " +
-                    "WHERE m.active = 1 " +
-                    "ORDER BY m.item_id";
+                "CASE WHEN i.qty_on_hand > 0 THEN 1 ELSE 0 END as available " +
+                "FROM menu_items m " +
+                "LEFT JOIN inventory i ON m.item_id = i.item_id " +
+                "WHERE m.active = 1 " +
+                "ORDER BY m.item_id";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-            PreparedStatement pstmt = conn.prepareStatement(sql);
-            ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 boolean active = rs.getInt("active") == 1;
                 boolean outOfStock = rs.getInt("out_of_stock") == 1;
                 MenuItemWithInventory item = new MenuItemWithInventory(
-                    rs.getString("item_id"),
-                    rs.getString("name"),
-                    rs.getString("description"),
-                    rs.getString("category"),
-                    rs.getDouble("price"),
-                    active,
-                    rs.getString("image_url"),
-                    rs.getString("dietary_tags")
-                );
+                        rs.getString("item_id"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getString("category"),
+                        rs.getDouble("price"),
+                        active,
+                        rs.getString("image_url"),
+                        rs.getString("dietary_tags"));
 
                 boolean available = rs.getInt("available") == 1;
 
@@ -139,7 +135,7 @@ public class MenuItemDAO {
                 item.setQtyOnHand(rs.getInt("qty_on_hand"));
                 item.setParLevel(rs.getInt("par_level"));
                 item.setReorderPoint(rs.getInt("reorder_point"));
-                item.setAvailable(available && !outOfStock);  // Not available if marked out of stock
+                item.setAvailable(available && !outOfStock); // Not available if marked out of stock
                 item.setOutOfStock(outOfStock);
                 menuItems.add(item);
             }
@@ -159,11 +155,12 @@ public class MenuItemDAO {
             menuItem.setItemId(itemId);
         }
 
-        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags, item_id) " +
+        String sql = "INSERT INTO menu_items (name, description, category, price, active, image_url, dietary_tags, item_id) "
+                +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             pstmt.setString(1, menuItem.getName());
             pstmt.setString(2, menuItem.getDescription());
@@ -191,8 +188,7 @@ public class MenuItemDAO {
                             userId,
                             userName,
                             null,
-                            objectToJson(newValues)
-                    );
+                            objectToJson(newValues));
                 }
                 return itemId;
             }
@@ -213,7 +209,7 @@ public class MenuItemDAO {
                 "price = ?, active = ?, image_url = ?, dietary_tags = ?, out_of_stock = ? WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, menuItem.getName());
             pstmt.setString(2, menuItem.getDescription());
@@ -250,27 +246,27 @@ public class MenuItemDAO {
                         userId,
                         userName,
                         objectToJson(oldValues),
-                        objectToJson(newValues)
-                );
+                        objectToJson(newValues));
             }
 
             return success;
         }
     }
-    
+
     // Backward compatible version without audit logging
     public boolean toggleMenuItemStatus(String itemId, Boolean active) throws SQLException {
         return toggleMenuItemStatus(itemId, active, null, null);
     }
 
-    public boolean toggleMenuItemStatus(String itemId, Boolean active, String userId, String userName) throws SQLException {
+    public boolean toggleMenuItemStatus(String itemId, Boolean active, String userId, String userName)
+            throws SQLException {
         // Get old value first for audit log
         MenuItem oldItem = getMenuItemById(itemId);
 
         String sql = "UPDATE menu_items SET active = ? WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setBoolean(1, active);
             pstmt.setString(2, itemId);
@@ -292,8 +288,7 @@ public class MenuItemDAO {
                         userId,
                         userName,
                         objectToJson(oldValues),
-                        objectToJson(newValues)
-                );
+                        objectToJson(newValues));
             }
 
             return success;
@@ -312,7 +307,7 @@ public class MenuItemDAO {
         String sql = "DELETE FROM menu_items WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(context);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, itemId);
             boolean success = pstmt.executeUpdate() > 0;
@@ -331,8 +326,7 @@ public class MenuItemDAO {
                         userId,
                         userName,
                         objectToJson(oldValues),
-                        null
-                );
+                        null);
             }
 
             return success;

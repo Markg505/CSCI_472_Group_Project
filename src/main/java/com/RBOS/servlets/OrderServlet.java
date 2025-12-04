@@ -51,7 +51,7 @@ public class OrderServlet extends HttpServlet {
         auditDAO = new AuditLogDAO(getServletContext());
         userDAO = new UserDAO(getServletContext());
     }
-    
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -166,7 +166,7 @@ public class OrderServlet extends HttpServlet {
 
                 String orderId = splits[1];
                 Order order = orderDAO.getOrderById(orderId);
-                
+
                 if (order != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(order));
                 } else {
@@ -208,9 +208,11 @@ public class OrderServlet extends HttpServlet {
 
             // ensure menu items exist to satisfy FK constraints
             if (order.getOrderItems() != null) {
-                order.getOrderItems().removeIf(i -> i == null || i.getItemId() == null || i.getItemId().isBlank() || i.getQty() == null || i.getQty() <= 0);
+                order.getOrderItems().removeIf(i -> i == null || i.getItemId() == null || i.getItemId().isBlank()
+                        || i.getQty() == null || i.getQty() <= 0);
                 for (OrderItem item : order.getOrderItems()) {
-                    ensureMenuItemPresent(menuItemDAO, item.getItemId(), item.getMenuItem() != null ? item.getMenuItem().getName() : null,
+                    ensureMenuItemPresent(menuItemDAO, item.getItemId(),
+                            item.getMenuItem() != null ? item.getMenuItem().getName() : null,
                             item.getUnitPrice() != null ? item.getUnitPrice() : 0.0);
                 }
                 if (order.getOrderItems().isEmpty()) {
@@ -223,22 +225,22 @@ public class OrderServlet extends HttpServlet {
             if ("delivery".equals(order.getFulfillmentType())) {
                 if (order.getDeliveryAddress() == null || order.getDeliveryAddress().isBlank()) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Delivery address is required for delivery orders");
+                            "Delivery address is required for delivery orders");
                     return;
                 }
                 if (order.getDeliveryCity() == null || order.getDeliveryCity().isBlank()) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Delivery city is required for delivery orders");
+                            "Delivery city is required for delivery orders");
                     return;
                 }
                 if (order.getDeliveryState() == null || order.getDeliveryState().isBlank()) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Delivery state is required for delivery orders");
+                            "Delivery state is required for delivery orders");
                     return;
                 }
                 if (order.getDeliveryPostalCode() == null || order.getDeliveryPostalCode().isBlank()) {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Delivery postal code is required for delivery orders");
+                            "Delivery postal code is required for delivery orders");
                     return;
                 }
             }
@@ -261,15 +263,15 @@ public class OrderServlet extends HttpServlet {
 
             for (OrderItem item : order.getOrderItems()) {
                 Inventory inventory = inventoryDAO.getInventoryByItemId(item.getItemId());
-                
+
                 if (inventory == null || !inventory.getActive()) {
                     outOfStockItems.add("Item not available: " + item.getItemId());
                     continue;
                 }
 
                 if (inventory.getQtyOnHand() < item.getQty()) {
-                    outOfStockItems.add("Insufficient stock for: " + inventory.getName() + 
-                        " (Available: " + inventory.getQtyOnHand() + ", Requested: " + item.getQty() + ")");
+                    outOfStockItems.add("Insufficient stock for: " + inventory.getName() +
+                            " (Available: " + inventory.getQtyOnHand() + ", Requested: " + item.getQty() + ")");
                     continue;
                 }
             }
@@ -288,10 +290,10 @@ public class OrderServlet extends HttpServlet {
 
             // Create order
             String orderId = orderDAO.createOrder(order, conn);
-            
+
             if (orderId != null) {
                 order.setOrderId(orderId);
-                
+
                 // Update inventory
                 for (OrderItem item : order.getOrderItems()) {
                     boolean success = inventoryDAO.decrementInventory(item.getItemId(), item.getQty(), conn);
@@ -302,14 +304,14 @@ public class OrderServlet extends HttpServlet {
                         return;
                     }
                 }
-                
+
                 conn.commit();
 
                 // Log audit
                 try {
                     String actorId = getSessionUserId(request);
                     auditDAO.log("order", orderId, "create", actorId, getSessionUserName(request),
-                                null, "Order created: $" + order.getTotal());
+                            null, "Order created: $" + order.getTotal());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -326,7 +328,10 @@ public class OrderServlet extends HttpServlet {
 
         } catch (Exception e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ex) {}
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                }
             }
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
             e.printStackTrace();
@@ -335,12 +340,14 @@ public class OrderServlet extends HttpServlet {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException e) {}
+                } catch (SQLException e) {
+                }
             }
         }
     }
 
-    private void handleHistory(HttpServletRequest request, HttpServletResponse response) throws IOException, SQLException {
+    private void handleHistory(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, SQLException {
         String rawStatus = request.getParameter("status");
         String rawStart = request.getParameter("start_utc");
         String rawEnd = request.getParameter("end_utc");
@@ -394,15 +401,15 @@ public class OrderServlet extends HttpServlet {
             return;
         }
 
-        PagedResult<Order> paged = orderDAO.getOrdersWithFilters(status, startUtc, endUtc, scopedUserId, page, pageSize);
+        PagedResult<Order> paged = orderDAO.getOrdersWithFilters(status, startUtc, endUtc, scopedUserId, page,
+                pageSize);
         HistoryResponse<Order> history = new HistoryResponse<>(
                 paged.getItems(),
                 page,
                 pageSize,
                 paged.getTotal(),
                 RETENTION_MONTHS,
-                LocalDate.now().minusMonths(RETENTION_MONTHS).toString()
-        );
+                LocalDate.now().minusMonths(RETENTION_MONTHS).toString());
         response.getWriter().write(objectMapper.writeValueAsString(history));
     }
 
@@ -446,7 +453,8 @@ public class OrderServlet extends HttpServlet {
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
-                if ("cart_token".equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                if ("cart_token".equals(cookie.getName()) && cookie.getValue() != null
+                        && !cookie.getValue().isBlank()) {
                     return cookie.getValue();
                 }
             }
@@ -541,15 +549,15 @@ public class OrderServlet extends HttpServlet {
     }
 
     private void sendOrderNotifications(Order order) {
-        // NOTE: Customer email notifications are now sent directly in OrderDAO.createOrder()
+        // NOTE: Customer email notifications are now sent directly in
+        // OrderDAO.createOrder()
         // with appropriate templates for delivery vs carryout orders
         try {
             // Send admin notification
             EmailService emailService = new EmailService();
             emailService.sendAdminNotification(
                     "New Order Received",
-                    String.format("Order #%s - Total: $%.2f", order.getOrderId(), order.getTotal())
-            );
+                    String.format("Order #%s - Total: $%.2f", order.getOrderId(), order.getTotal()));
 
             // Send WebSocket notification for real-time updates
             String orderJson = objectMapper.writeValueAsString(order);
@@ -573,7 +581,9 @@ public class OrderServlet extends HttpServlet {
             if (cart == null && requestedToken != null) {
                 cart = orderDAO.getCartByToken(requestedToken, conn);
                 if (cart != null && cart.getUserId() != null && !cart.getUserId().equals(sessionUserId)) {
-                    response.sendError(sessionUserId == null ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN,
+                    response.sendError(
+                            sessionUserId == null ? HttpServletResponse.SC_UNAUTHORIZED
+                                    : HttpServletResponse.SC_FORBIDDEN,
                             "Cart is bound to another user");
                     return;
                 }
@@ -614,8 +624,7 @@ public class OrderServlet extends HttpServlet {
             payload.put("conflicts", Map.of(
                     "dropped", new ArrayList<>(),
                     "clamped", new ArrayList<>(),
-                    "merged", new ArrayList<>()
-            ));
+                    "merged", new ArrayList<>()));
 
             stampCartToken(response, request, cart.getCartToken());
             response.getWriter().write(objectMapper.writeValueAsString(payload));
@@ -624,13 +633,15 @@ public class OrderServlet extends HttpServlet {
         }
     }
 
-    private void handleMergeCart(HttpServletRequest request, HttpServletResponse response, Connection conn) throws IOException {
+    private void handleMergeCart(HttpServletRequest request, HttpServletResponse response, Connection conn)
+            throws IOException {
         String sessionUserId = getSessionUserId(request);
         String requestedToken = resolveCartToken(request);
 
         try {
             CartMergePayload payload = objectMapper.readValue(request.getReader(), CartMergePayload.class);
-            List<CartMergeService.MergeItem> incoming = payload != null && payload.items != null ? payload.items : new ArrayList<>();
+            List<CartMergeService.MergeItem> incoming = payload != null && payload.items != null ? payload.items
+                    : new ArrayList<>();
             incoming.removeIf(i -> i == null || i.itemId == null || i.itemId.isBlank());
             if (payload != null && payload.cartToken != null && (requestedToken == null || requestedToken.isBlank())) {
                 requestedToken = payload.cartToken;
@@ -645,7 +656,8 @@ public class OrderServlet extends HttpServlet {
             }
 
             if (cart != null && cart.getUserId() != null && !cart.getUserId().equals(sessionUserId)) {
-                response.sendError(sessionUserId == null ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN,
+                response.sendError(
+                        sessionUserId == null ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN,
                         "Cart is bound to another user");
                 return;
             }
@@ -699,7 +711,8 @@ public class OrderServlet extends HttpServlet {
                     continue;
                 }
                 if (!inventoryByItem.containsKey(item.itemId)) {
-                    ensureMenuItemPresent(new MenuItemDAO(getServletContext()), item.itemId, item.name, item.unitPrice != null ? item.unitPrice : 0.0);
+                    ensureMenuItemPresent(new MenuItemDAO(getServletContext()), item.itemId, item.name,
+                            item.unitPrice != null ? item.unitPrice : 0.0);
                     Inventory inv = inventoryDAO.getInventoryByItemId(item.itemId);
                     if (inv == null) {
                         inv = fallbackInventory(item.itemId, item.name);
@@ -711,15 +724,18 @@ public class OrderServlet extends HttpServlet {
                 if (!inventoryByItem.containsKey(item.getItemId())) {
                     Inventory inv = inventoryDAO.getInventoryByItemId(item.getItemId());
                     if (inv == null) {
-                        inv = fallbackInventory(item.getItemId(), item.getMenuItem() != null ? item.getMenuItem().getName() : null);
+                        inv = fallbackInventory(item.getItemId(),
+                                item.getMenuItem() != null ? item.getMenuItem().getName() : null);
                     }
                     inventoryByItem.put(item.getItemId(), inv);
                 }
             }
 
-            CartMergeService.MergeResult result = new CartMergeService().merge(incoming, existingItems, inventoryByItem);
+            CartMergeService.MergeResult result = new CartMergeService().merge(incoming, existingItems,
+                    inventoryByItem);
 
-            // Filter out menu items that no longer exist to avoid FK failures, and create missing menu rows
+            // Filter out menu items that no longer exist to avoid FK failures, and create
+            // missing menu rows
             MenuItemDAO menuItemDAO = new MenuItemDAO(getServletContext());
             List<OrderItem> persistedItems = new ArrayList<>();
             List<CartMergeService.Conflict> droppedConflicts = new ArrayList<>(result.getDropped());
@@ -785,7 +801,11 @@ public class OrderServlet extends HttpServlet {
             response.getWriter().write(objectMapper.writeValueAsString(responseBody));
 
         } catch (SQLException e) {
-            try { if (conn != null) conn.rollback(); } catch (SQLException ignored) {}
+            try {
+                if (conn != null)
+                    conn.rollback();
+            } catch (SQLException ignored) {
+            }
             if (e.getMessage() != null && e.getMessage().toLowerCase().contains("busy")) {
                 response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Database is busy, please retry");
             } else {
@@ -793,24 +813,24 @@ public class OrderServlet extends HttpServlet {
             }
         }
     }
-    
+
     @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length < 2) {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
-            
+
             String[] pathParts = pathInfo.split("/");
             String orderId = pathParts[1];
-            
+
             boolean statusPath = pathParts.length >= 3 && "status".equals(pathParts[2]);
             if (statusPath) {
                 // Update only order status
@@ -819,7 +839,7 @@ public class OrderServlet extends HttpServlet {
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Status parameter required");
                     return;
                 }
-                
+
                 // Get old order for audit
                 Order oldOrder = orderDAO.getOrderById(orderId);
                 String oldStatus = oldOrder != null ? oldOrder.getStatus() : null;
@@ -830,7 +850,7 @@ public class OrderServlet extends HttpServlet {
                     try {
                         String actorId = getSessionUserId(request);
                         auditDAO.log("order", orderId, "update_status", actorId, getSessionUserName(request),
-                                    "Status: " + oldStatus, "Status: " + newStatus);
+                                "Status: " + oldStatus, "Status: " + newStatus);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -857,8 +877,7 @@ public class OrderServlet extends HttpServlet {
                                         user.getFullName(),
                                         String.valueOf(orderId),
                                         newStatus,
-                                        updateMessage
-                                );
+                                        updateMessage);
                             }
                         }
                     } catch (Exception e) {
@@ -879,9 +898,9 @@ public class OrderServlet extends HttpServlet {
                 // Update entire order
                 Order order = objectMapper.readValue(request.getReader(), Order.class);
                 order.setOrderId(orderId); // Ensure the ID matches the path
-                
+
                 boolean success = orderDAO.updateOrder(order);
-                
+
                 if (success) {
                     response.getWriter().write(objectMapper.writeValueAsString(order));
                 } else {
@@ -892,7 +911,7 @@ public class OrderServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             e.printStackTrace();
         } catch (NumberFormatException e) {
-                response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
 
@@ -903,12 +922,13 @@ public class OrderServlet extends HttpServlet {
         }
         // try JSON body
         try {
-            Map<?,?> body = objectMapper.readValue(request.getReader(), Map.class);
+            Map<?, ?> body = objectMapper.readValue(request.getReader(), Map.class);
             Object statusObj = body.get("status");
             if (statusObj != null && !statusObj.toString().isBlank()) {
                 return statusObj.toString();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         // try query string manually
         String qs = request.getQueryString();
         if (qs != null) {
@@ -933,9 +953,9 @@ public class OrderServlet extends HttpServlet {
     }
 
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -945,7 +965,7 @@ public class OrderServlet extends HttpServlet {
 
             String orderId = pathInfo.split("/")[1];
             boolean success = orderDAO.deleteOrder(orderId);
-            
+
             if (success) {
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
@@ -961,10 +981,12 @@ public class OrderServlet extends HttpServlet {
 
     private String getSessionUserName(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null) return "System";
+        if (session == null)
+            return "System";
         try {
             String userId = getSessionUserId(request);
-            if (userId == null) return "System";
+            if (userId == null)
+                return "System";
             User user = userDAO.getUserById(userId);
             return user != null ? user.getFullName() : "System";
         } catch (Exception e) {

@@ -127,9 +127,11 @@ public class ReservationServlet extends HttpServlet {
                     } else if (reservation.getGuestName() == null || reservation.getGuestName().isBlank()) {
                         reservation.setGuestName(existing.getFullName());
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
-            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank()) && reservation.getUserId() == null) {
+            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank())
+                    && reservation.getUserId() == null) {
                 reservation.setGuestName("Guest");
             }
             if (reservation.getReservationId() == null || reservation.getReservationId().isBlank()) {
@@ -199,7 +201,8 @@ public class ReservationServlet extends HttpServlet {
         }
     }
 
-    private void handleHistory(HttpServletRequest request, HttpServletResponse response) throws IOException, SQLException {
+    private void handleHistory(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, SQLException {
         int page = HistoryValidation.normalizePage(parseInteger(request.getParameter("page")));
         int pageSize = HistoryValidation.clampPageSize(parseInteger(request.getParameter("pageSize")));
 
@@ -253,15 +256,15 @@ public class ReservationServlet extends HttpServlet {
             return;
         }
 
-        PagedResult<Reservation> paged = reservationDAO.getReservationsWithFilters(status, startUtc, endUtc, scopedUserId, page, pageSize);
+        PagedResult<Reservation> paged = reservationDAO.getReservationsWithFilters(status, startUtc, endUtc,
+                scopedUserId, page, pageSize);
         HistoryResponse<Reservation> history = new HistoryResponse<>(
                 paged.getItems(),
                 page,
                 pageSize,
                 paged.getTotal(),
                 RETENTION_MONTHS,
-                LocalDate.now().minusMonths(RETENTION_MONTHS).toString()
-        );
+                LocalDate.now().minusMonths(RETENTION_MONTHS).toString());
         response.getWriter().write(objectMapper.writeValueAsString(history));
     }
 
@@ -343,9 +346,11 @@ public class ReservationServlet extends HttpServlet {
                     } else if (reservation.getGuestName() == null || reservation.getGuestName().isBlank()) {
                         reservation.setGuestName(existing.getFullName());
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
-            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank()) && reservation.getUserId() == null) {
+            if ((reservation.getGuestName() == null || reservation.getGuestName().isBlank())
+                    && reservation.getUserId() == null) {
                 reservation.setGuestName("Guest");
             }
             boolean success = reservationDAO.updateReservation(reservation);

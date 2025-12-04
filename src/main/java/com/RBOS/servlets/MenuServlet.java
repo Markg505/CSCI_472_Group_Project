@@ -34,34 +34,34 @@ public class MenuServlet extends HttpServlet {
         auditDAO = new AuditLogDAO(getServletContext());
         userDAO = new UserDAO(getServletContext());
     }
-    
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
+
             if (pathInfo == null || pathInfo.equals("/")) {
                 // Check if we want only active items
                 String activeOnly = request.getParameter("activeOnly");
                 List<MenuItem> menuItems;
-                
+
                 if ("true".equalsIgnoreCase(activeOnly)) {
                     menuItems = menuItemDAO.getActiveMenuItems();
                 } else {
                     menuItems = menuItemDAO.getAllMenuItems();
                 }
-                
+
                 response.getWriter().write(objectMapper.writeValueAsString(menuItems));
-            }   else if ("/with-inventory".equals(pathInfo)) {
+            } else if ("/with-inventory".equals(pathInfo)) {
                 // Get menu items with inventory information
                 List<MenuItemWithInventory> menuItems = menuItemDAO.getActiveMenuItemsWithInventory();
                 response.getWriter().write(objectMapper.writeValueAsString(menuItems));
-            }   else if ("/active".equals(pathInfo)) {
+            } else if ("/active".equals(pathInfo)) {
                 // Get only active menu items
                 List<MenuItem> activeItems = menuItemDAO.getActiveMenuItems();
                 response.getWriter().write(objectMapper.writeValueAsString(activeItems));
@@ -75,7 +75,7 @@ public class MenuServlet extends HttpServlet {
 
                 String itemId = splits[1];
                 MenuItem menuItem = menuItemDAO.getMenuItemById(itemId);
-                
+
                 if (menuItem != null) {
                     response.getWriter().write(objectMapper.writeValueAsString(menuItem));
                 } else {
@@ -89,19 +89,19 @@ public class MenuServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             JsonNode root = objectMapper.readTree(request.getReader());
             MenuItem menuItem = objectMapper.treeToValue(root, MenuItem.class);
             String itemId = menuItemDAO.createMenuItem(menuItem);
-            
+
             if (itemId != null) {
                 menuItem.setItemId(itemId);
 
@@ -209,11 +209,11 @@ public class MenuServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
-    
+
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         try {
             String pathInfo = request.getPathInfo();
             if (pathInfo == null || pathInfo.split("/").length != 2) {
@@ -255,7 +255,7 @@ public class MenuServlet extends HttpServlet {
         String sql = "UPDATE menu_items SET image_url = ? WHERE item_id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(getServletContext());
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, imageUrl);
             pstmt.setString(2, itemId);
@@ -282,17 +282,20 @@ public class MenuServlet extends HttpServlet {
 
     private String getSessionUserId(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null) return "system";
+        if (session == null)
+            return "system";
         Object userId = session.getAttribute("userId");
         return userId != null ? userId.toString() : "system";
     }
 
     private String getSessionUserName(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null) return "System";
+        if (session == null)
+            return "System";
         try {
             String userId = getSessionUserId(request);
-            if ("system".equals(userId)) return "System";
+            if ("system".equals(userId))
+                return "System";
             User user = userDAO.getUserById(userId);
             return user != null ? user.getFullName() : "System";
         } catch (Exception e) {
