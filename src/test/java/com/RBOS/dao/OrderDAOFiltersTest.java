@@ -54,6 +54,9 @@ public class OrderDAOFiltersTest {
 
         Order order = result.getItems().get(0);
         assertEquals("order-1", order.getOrderId());
+        assertEquals("delivery", order.getFulfillmentType());
+        assertEquals("Customer One", order.getCustomerName());
+        assertEquals("Portales", order.getDeliveryCity());
         List<OrderItem> items = order.getOrderItems();
         assertNotNull("Order items should be loaded from join", items);
         assertEquals(1, items.size());
@@ -87,7 +90,27 @@ public class OrderDAOFiltersTest {
             stmt.execute("DROP TABLE IF EXISTS users");
             stmt.execute("CREATE TABLE users (user_id TEXT PRIMARY KEY, role TEXT, full_name TEXT, email TEXT, phone TEXT, password_hash TEXT)");
             stmt.execute("CREATE TABLE menu_items (item_id TEXT PRIMARY KEY, name TEXT, price REAL)");
-            stmt.execute("CREATE TABLE orders (order_id TEXT PRIMARY KEY, user_id TEXT, cart_token TEXT, source TEXT, status TEXT, subtotal REAL, tax REAL, total REAL, created_utc TEXT, FOREIGN KEY (user_id) REFERENCES users(user_id))");
+            stmt.execute("CREATE TABLE orders (" +
+                    "order_id TEXT PRIMARY KEY, " +
+                    "user_id TEXT, " +
+                    "cart_token TEXT, " +
+                    "source TEXT, " +
+                    "status TEXT, " +
+                    "fulfillment_type TEXT, " +
+                    "subtotal REAL, " +
+                    "tax REAL, " +
+                    "total REAL, " +
+                    "customer_name TEXT, " +
+                    "customer_phone TEXT, " +
+                    "customer_email TEXT, " +
+                    "delivery_address TEXT, " +
+                    "delivery_address2 TEXT, " +
+                    "delivery_city TEXT, " +
+                    "delivery_state TEXT, " +
+                    "delivery_postal_code TEXT, " +
+                    "delivery_instructions TEXT, " +
+                    "created_utc TEXT, " +
+                    "FOREIGN KEY (user_id) REFERENCES users(user_id))");
             stmt.execute("CREATE TABLE order_items (order_item_id TEXT PRIMARY KEY, order_id TEXT, item_id TEXT, qty INTEGER, unit_price REAL, line_total REAL, notes TEXT, FOREIGN KEY (order_id) REFERENCES orders(order_id), FOREIGN KEY (item_id) REFERENCES menu_items(item_id))");
         }
     }
@@ -127,16 +150,31 @@ public class OrderDAOFiltersTest {
     }
 
     private void seedOrders(Connection conn) throws Exception {
-        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO orders (order_id, user_id, cart_token, source, status, subtotal, tax, total, created_utc) VALUES (?,?,?,?,?,?,?,?,?)")) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO orders (" +
+                        "order_id, user_id, cart_token, source, status, fulfillment_type, subtotal, tax, total, " +
+                        "customer_name, customer_phone, customer_email, delivery_address, delivery_address2, " +
+                        "delivery_city, delivery_state, delivery_postal_code, delivery_instructions, created_utc" +
+                        ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, "order-1");
             ps.setString(2, "user-1");
             ps.setString(3, "cart-1");
             ps.setString(4, "web");
             ps.setString(5, "placed");
-            ps.setDouble(6, 20.0);
-            ps.setDouble(7, 1.6);
-            ps.setDouble(8, 21.6);
-            ps.setString(9, "2024-01-01T10:00:00Z");
+            ps.setString(6, "delivery");
+            ps.setDouble(7, 20.0);
+            ps.setDouble(8, 1.6);
+            ps.setDouble(9, 21.6);
+            ps.setString(10, "Customer One");
+            ps.setString(11, "555-1000");
+            ps.setString(12, "one@example.com");
+            ps.setString(13, "123 Main St");
+            ps.setString(14, "Apt 1");
+            ps.setString(15, "Portales");
+            ps.setString(16, "NM");
+            ps.setString(17, "88130");
+            ps.setString(18, "Leave at door");
+            ps.setString(19, "2024-01-01T10:00:00Z");
             ps.executeUpdate();
 
             ps.setString(1, "order-2");
@@ -144,10 +182,20 @@ public class OrderDAOFiltersTest {
             ps.setString(3, "cart-2");
             ps.setString(4, "web");
             ps.setString(5, "paid");
-            ps.setDouble(6, 30.0);
-            ps.setDouble(7, 2.4);
-            ps.setDouble(8, 32.4);
-            ps.setString(9, "2024-01-02T10:00:00Z");
+            ps.setString(6, "carryout");
+            ps.setDouble(7, 30.0);
+            ps.setDouble(8, 2.4);
+            ps.setDouble(9, 32.4);
+            ps.setString(10, "Customer One");
+            ps.setString(11, "555-1000");
+            ps.setString(12, "one@example.com");
+            ps.setString(13, "123 Main St");
+            ps.setString(14, "Apt 1");
+            ps.setString(15, "Portales");
+            ps.setString(16, "NM");
+            ps.setString(17, "88130");
+            ps.setString(18, "Pickup at counter");
+            ps.setString(19, "2024-01-02T10:00:00Z");
             ps.executeUpdate();
 
             ps.setString(1, "order-3");
@@ -155,10 +203,20 @@ public class OrderDAOFiltersTest {
             ps.setString(3, "cart-3");
             ps.setString(4, "phone");
             ps.setString(5, "cancelled");
-            ps.setDouble(6, 15.0);
-            ps.setDouble(7, 1.2);
-            ps.setDouble(8, 16.2);
-            ps.setString(9, "2024-01-03T10:00:00Z");
+            ps.setString(6, "delivery");
+            ps.setDouble(7, 15.0);
+            ps.setDouble(8, 1.2);
+            ps.setDouble(9, 16.2);
+            ps.setString(10, "Customer Two");
+            ps.setString(11, "555-2000");
+            ps.setString(12, "two@example.com");
+            ps.setString(13, "456 Market St");
+            ps.setString(14, null);
+            ps.setString(15, "Denver");
+            ps.setString(16, "CO");
+            ps.setString(17, "80202");
+            ps.setString(18, "Ring bell");
+            ps.setString(19, "2024-01-03T10:00:00Z");
             ps.executeUpdate();
         }
     }

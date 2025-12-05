@@ -71,7 +71,7 @@ public class ReservationServletTest {
         Instant now = Instant.now();
         createReservation(customerId, "pending", now.minus(1, ChronoUnit.DAYS));
         createReservation(customerId, "confirmed", now.minus(2, ChronoUnit.DAYS));
-        createReservation(otherUserId, "confirmed", now.minus(1, ChronoUnit.DAYS));
+        createReservation(otherUserId, "confirmed", now.minus(3, ChronoUnit.DAYS));
 
         servlet = new ReservationServlet();
         servlet.init(buildServletConfig());
@@ -153,8 +153,10 @@ public class ReservationServletTest {
 
         servlet.doGet(request, response.response());
 
-        assertEquals(HttpServletResponse.SC_BAD_REQUEST, response.status());
-        assertTrue(response.errorMessage().contains("Requested range is outside the retention window"));
+        assertEquals(HttpServletResponse.SC_OK, response.status());
+        HistoryResponse<Reservation> history = mapper.readValue(response.body().toString(), new TypeReference<HistoryResponse<Reservation>>() {});
+        assertEquals(0, history.getTotal());
+        assertTrue("Future-only range should return no reservations", history.getItems().isEmpty());
     }
 
     @Test

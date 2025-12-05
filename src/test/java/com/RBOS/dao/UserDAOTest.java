@@ -58,11 +58,25 @@ public class UserDAOTest {
         user.setEmail("original@example.com");
         user.setPhone("555-0000");
         user.setPassword("oldPass123");
+        user.setAddress("123 Old St");
+        user.setAddress2("Unit 1");
+        user.setCity("Oldtown");
+        user.setState("NM");
+        user.setPostalCode("99999");
 
         String userId = dao.createUser(user);
         assertNotNull("User should be created with generated id", userId);
 
-        boolean updated = dao.updateProfile(userId, "Updated User", "updated@example.com", "555-1111");
+        boolean updated = dao.updateProfile(
+                userId,
+                "Updated User",
+                "updated@example.com",
+                "555-1111",
+                "456 New Ave",
+                "Apt 2",
+                "New City",
+                "CA",
+                "90210");
         assertTrue("Profile update should succeed", updated);
 
         User reloaded = dao.getUserById(userId);
@@ -70,6 +84,11 @@ public class UserDAOTest {
         assertEquals("Updated User", reloaded.getFullName());
         assertEquals("updated@example.com", reloaded.getEmail());
         assertEquals("555-1111", reloaded.getPhone());
+        assertEquals("456 New Ave", reloaded.getAddress());
+        assertEquals("Apt 2", reloaded.getAddress2());
+        assertEquals("New City", reloaded.getCity());
+        assertEquals("CA", reloaded.getState());
+        assertEquals("90210", reloaded.getPostalCode());
     }
 
     @Test
