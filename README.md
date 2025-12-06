@@ -32,14 +32,14 @@ Example for setting your enviroment variables are below. You will need to set th
 ### Start and Deploy
 **Windows:**
 1. Start GlassFish: `%GLASSFISH_HOME%\bin\asadmin.bat start-domain`
-2. Build and deploy: `ant run`
+2. Build and deploy from the project root folder: `ant run`
    - Use `ant "-Drefresh.db=true" run` once to rebuild the SQLite DB schema/seed at `%USERPROFILE%\.rbos\restaurant.db`
 3. Access the application at: `http://localhost:8080/RBOS/`
    - Admin console: `http://localhost:8080/RBOS/admin`
 
 **Linux or OSx:**
 1. Start GlassFish: `$GLASSFISH_HOME/bin/asadmin start-domain`
-2. Build and deploy: `ant run`
+2. Build and deploy from the project root folder: `ant run`
    - Use `ant -Drefresh.db=true run` once to rebuild the SQLite DB schema/seed at `~/.rbos/restaurant.db`
 3. Access the application at: `http://localhost:8080/RBOS/`
    - Admin console: `http://localhost:8080/RBOS/admin`
