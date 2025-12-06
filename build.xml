@@ -22,12 +22,16 @@
     <property name="jacoco.instrumented.dir" value="${build.dir}/classes-instrumented"/>
     <property name="jacoco.line.coverage.minimum" value="0.0"/>
 
-    <property name="java17.home" value="../../Program Files/Java/jdk-17"/>
+    <condition property="java17.home" value="${env.JAVA_HOME}">
+    <isset property="env.JAVA_HOME"/>
+    </condition>
+    <property name="java17.home" value="${java.home}"/>
 
     <condition property="glassfish.home" value="${env.GLASSFISH_HOME}">
         <isset property="env.GLASSFISH_HOME"/>
     </condition>
-    <property name="glassfish.home" value="../../glassfish-7.0.25/glassfish7"/>
+    <fail unless="glassfish.home" 
+      message="GLASSFISH_HOME environment variable must be set. Please set it to your GlassFish 7 installation directory."/>
     <!-- Admin listener port for this domain; override with -Dglassfish.admin.port or set AS_ADMIN_PORT.
          Defaults to 4848 (GlassFish default) for portability across machines. -->
     <condition property="glassfish.admin.port" value="${env.AS_ADMIN_PORT}">
@@ -94,18 +98,37 @@
         </delete>
     </target>
 
-    <target name="build-frontend">
-        <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
-            <arg value="/c"/>
-            <arg value="npm"/>
-            <arg value="install"/>
-        </exec>
-        <exec executable="cmd" dir="${frontend.dir}" failonerror="true">
-            <arg value="/c"/>
-            <arg value="npm"/>
-            <arg value="run"/>
-            <arg value="build"/>
-        </exec>
+    <target name="-check-npm">
+    <exec executable="npm.cmd" outputproperty="npm.version" failonerror="false" osfamily="windows">
+        <arg value="--version"/>
+    </exec>
+    <exec executable="npm" outputproperty="npm.version" failonerror="false" osfamily="unix">
+        <arg value="--version"/>
+    </exec>
+    <fail message="Node.js and npm must be installed. Download from https://nodejs.org/">
+        <condition>
+            <equals arg1="${npm.version}" arg2=""/>
+        </condition>
+    </fail>
+</target>
+
+<target name="build-frontend" depends="-check-npm">
+    <!-- Cross-platform npm commands -->
+    <exec executable="npm.cmd" dir="${frontend.dir}" failonerror="true" osfamily="windows">
+        <arg value="install"/>
+    </exec>
+    <exec executable="npm" dir="${frontend.dir}" failonerror="true" osfamily="unix">
+        <arg value="install"/>
+    </exec>
+    
+    <exec executable="npm.cmd" dir="${frontend.dir}" failonerror="true" osfamily="windows">
+        <arg value="run"/>
+        <arg value="build"/>
+    </exec>
+    <exec executable="npm" dir="${frontend.dir}" failonerror="true" osfamily="unix">
+        <arg value="run"/>
+        <arg value="build"/>
+    </exec>
         <copy todir="${webcontent.dir}">
             <fileset dir="${frontend.dir}/dist">
                 <include name="**/*"/>
@@ -261,15 +284,51 @@
     </target>
 
     <target name="deploy" depends="package-war">
-        <echo message="Deploying to GlassFish..."/>
-        <exec executable="${glassfish.home}/bin/asadmin.bat">
-            <arg value="--port"/>
-            <arg value="${glassfish.admin.port}"/>
-            <arg value="deploy"/>
-            <arg value="--force=true"/>
-            <arg value="${war.file}"/>
-        </exec>
-        <echo message="Application deployed successfully"/>
-    </target>
+    <echo message="Deploying to GlassFish..."/>
+    <exec executable="${glassfish.home}/bin/asadmin.bat" osfamily="windows" failonerror="true">
+        <arg value="--port"/>
+        <arg value="${glassfish.admin.port}"/>
+        <arg value="deploy"/>
+        <arg value="--force=true"/>
+        <arg value="${war.file}"/>
+    </exec>
+    <exec executable="${glassfish.home}/bin/asadmin" osfamily="unix" failonerror="true">
+        <arg value="--port"/>
+        <arg value="${glassfish.admin.port}"/>
+        <arg value="deploy"/>
+        <arg value="--force=true"/>
+        <arg value="${war.file}"/>
+    </exec>
+    <echo message="Application deployed successfully"/>
+</target>
 
+    <target name="run" depends="deploy" description="Deploy and display application URL">
+    <echo message="Application deployed successfully!"/>
+    <echo message="Access the application at:"/>
+    <echo message="http://localhost:8080/RBOS/"/>
+    <echo message=""/>
+    <echo message="To stop the application:"/>
+    <echo message="  ant undeploy"/>
+    <echo message=""/>
+    <echo message="To stop GlassFish:"/>
+    <echo message="  ${glassfish.home}/bin/asadmin stop-domain"/>
+</target>
+
+<target name="undeploy" description="Undeploy the application from GlassFish">
+    <echo message="Undeploying from GlassFish..."/>
+    <exec executable="${glassfish.home}/bin/asadmin.bat" osfamily="windows">
+        <arg value="--port"/>
+        <arg value="${glassfish.admin.port}"/>
+        <arg value="undeploy"/>
+        <arg value="${ant.project.name}"/>
+    </exec>
+    <exec executable="${glassfish.home}/bin/asadmin" osfamily="unix">
+        <arg value="--port"/>
+        <arg value="${glassfish.admin.port}"/>
+        <arg value="undeploy"/>
+        <arg value="${ant.project.name}"/>
+    </exec>
+    <echo message="Application undeployed successfully"/>
+</target>
 </project>
+
