@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useCart } from "../features/cart/CartContext";
+import { Link } from "react-router-dom";
 import { useNotifications } from "../features/notifications/NotificationContext";
 import { apiClient, type MenuItemWithInventory } from "../api/client";
 
@@ -244,9 +245,9 @@ export default function MenuPage() {
               Seasonal, local and made from scratch. Filter by dietary tags or search for your favorite dish.
             </p>
             <div className="mt-6">
-              <a href="/reservations" className="btn-primary">
+              <Link to="/reservations" className="btn-primary">
                 Reserve a table
-              </a>
+              </Link>
             </div>
           </div>
         </div>
