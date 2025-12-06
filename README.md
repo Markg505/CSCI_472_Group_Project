@@ -48,7 +48,7 @@ You can alternatively use these commands to deploy the app `asadmin start-domain
 
 ### Testing
 - To run all tests, use `ant test`. Coverage reports are generated via `ant coverage`.
-- 
+
 ### Alternative Build Option
 - Build WAR frontend and backend `ant package-war`
 - Deploy to GlassFish:
