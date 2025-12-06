@@ -13,11 +13,11 @@
 2. Set `GLASSFISH_HOME` environment variable to your GlassFish installation directory (e.g., `C:\glassfish7`)
 Example for setting your enviroment variables are below. You will need to set the file path that corresponds to the actual location in your system.
  **Windows using Powershell or CMD:**
-# Set environment variables (replace paths with your actual installation directories)
+# Set environment variables and make sure to replace the paths with your install directories
 setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
 setx GLASSFISH_HOME "C:\glassfish7" 
 **Linux or OSx using Bash:**
-# Add to ~/.bashrc or ~/.bash_profile (replace paths with your actual installation directories)
+# Add to ~/.bashrc or ~/.bash_profile make sure to replace the paths with your install directories
 export JAVA_HOME="/usr/lib/jvm/java-17-openjdk"
 export GLASSFISH_HOME="/opt/glassfish7"
 4. Restart your terminal/PowerShell after setting environment variables
