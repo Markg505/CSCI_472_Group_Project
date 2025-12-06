@@ -15,13 +15,13 @@ Example for setting your enviroment variables are below. You will need to set th
 
  **Windows using Powershell or CMD:**
  Set environment variables and make sure to replace the paths with your actual install directories
-'setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"'
-'setx GLASSFISH_HOME "C:\glassfish7"'
+`setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"`
+`setx GLASSFISH_HOME "C:\glassfish7"`
 
 **Linux or OSx using Bash:**
  Add to ~/.bashrc or ~/.bash_profile make sure to replace the paths with your acutal install directories
-'export JAVA_HOME="/usr/lib/jvm/java-17-openjdk"'
-'export GLASSFISH_HOME="/opt/glassfish7"'
+`export JAVA_HOME="/usr/lib/jvm/java-17-openjdk"`
+`export GLASSFISH_HOME="/opt/glassfish7"`
 
 4. Restart your terminal/PowerShell after setting environment variables
 
