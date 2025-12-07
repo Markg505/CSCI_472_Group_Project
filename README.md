@@ -31,10 +31,11 @@ Example for setting your enviroment variables are below. You will need to set th
 
 ### Start and Deploy
 **Windows:**
-1. Start GlassFish: `%GLASSFISH_HOME%\bin\asadmin.bat start-domain`
-2. Build and deploy from the project root folder: `ant run`
+1. Start GlassFish server: `%GLASSFISH_HOME%\bin\asadmin.bat start-domain` or if that fails you can use the glassfish directory directly eg. `C:\glassfish7\bin\asadmin start-domain`
+  -Commands may vary depending on the shell being used. The path must be set correctly before the commands will work.
+3. Build and deploy from the project root folder: `ant run`
    - Use `ant "-Drefresh.db=true" run` once to rebuild the SQLite DB schema/seed at `%USERPROFILE%\.rbos\restaurant.db`
-3. Access the application at: `http://localhost:8080/RBOS/`
+4. Access the application at: `http://localhost:8080/RBOS/`
    - Admin console: `http://localhost:8080/RBOS/admin`
 
 **Linux or OSx:**
@@ -47,7 +48,9 @@ Example for setting your enviroment variables are below. You will need to set th
 You can alternatively use these commands to deploy the app `asadmin start-domain <DOMAIN>` then `asadmin deploy --force dist/RBOS.war`
 
 ### Testing
-- To run all tests, use `ant test`. Coverage reports are generated via `ant coverage`.
+- To run all tests, use `ant test`. This will clean and rebuild the WAR as well.
+- Coverage reports are generated via `ant coverage`. This is the recommended command as it will generate both xml testing reports and coverage reports.
+- All reports will be availible inside the root directory build file here `CSCI_472_Group_Project\build\reports`
 
 ### Alternative Build Option
 - Build WAR frontend and backend `ant package-war`
